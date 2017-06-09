@@ -1,0 +1,24 @@
+import { isObject, isArray } from './assertions';
+
+export const clone = input =>
+  !isArray(input)
+    ? (isObject(input)
+      ? Object.assign({}, input)
+      : input)
+    : input.map(clone);
+
+export const noop = () => {};
+export const identity = arg => arg;
+export const not = (input) => !input;
+
+export const isAttached = element => {
+
+  if (element === document)
+    return true;
+
+  element = element.parentNode;
+  if (element)
+    return isAttached(element);
+
+  return false;
+};

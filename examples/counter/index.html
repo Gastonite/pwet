@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PWET : Simple counter component example</title>
+    <style>
+        body {
+            font-size: 18px;
+        }
+        h1 {
+            font-size: 24px;
+        }
+        ul {
+            list-style: none;
+        }
+        li {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Simple counter component example</h1>
+<ul>
+    <li>
+        <strong>Already in the document : </strong>
+        <ul>
+            <li>
+                <strong>no state</strong>
+                <small>defaults to 0</small>
+                =>
+                <x-counter></x-counter>
+            </li>
+            <li>
+                <strong>by attribute</strong>
+                <small>count="42"</small>
+                =>
+                <x-counter count="42"></x-counter>
+            </li>
+        </ul>
+    </li>
+    <li>
+        <strong>Dynamically created : </strong>
+        <ul>
+            <li id="no-state">
+                <strong>no state</strong>
+                <small>defaults to 0</small>
+                =>
+            </li>
+            <li id="property">
+                <strong>by property</strong>
+                <small>counter.count = 1000</small>
+                =>
+            </li>
+            <li id="attribute">
+                <strong>by attribute</strong>
+                <small>count.setAttribute('count', '1000')</small>
+                =>
+            </li>
+        </ul>
+    </li>
+</ul>
+</body>
+</html>
