@@ -1,6 +1,6 @@
 {
   "name": "pwet",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Utility for building Webcomponents with factory functions :)",
   "main": "src/component.js",
   "module": "src/component.js",
@@ -9,10 +9,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://gitlab/gastonite/pwet.git"
+    "url": "https://github.com/Gastonite/pwet"
   },
   "author": "Clément Pasquier <clement@n00sphere.net>",
   "license": "GPL-3.0",
+  "keywords": [
+    "custom-elements",
+    "custom",
+    "elements",
+    "web-components",
+    "web",
+    "components"
+  ],
   "devDependencies": {
     "@webcomponents/custom-elements": "https://github.com/webcomponents/custom-elements/archive/f4b6f1f.tar.gz",
     "@webcomponents/shadycss": "https://github.com/webcomponents/shadycss/archive/bea402d.tar.gz",
