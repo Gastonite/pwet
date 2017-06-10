@@ -93,11 +93,7 @@ internal.Component = (factory, element, properties = {}) => {
     const prev = _previousState;
     const next = _previousState = element.state;
 
-    // log('element.stateUpdatedCallback()', next);
-
     if (!prev || Object.keys(prev).some(key => prev[key] !== next[key])) {
-
-      // log('element.stateChangedCallback()');
 
       let root = element;
 
@@ -115,8 +111,6 @@ internal.Component = (factory, element, properties = {}) => {
 
   const attach = () => {
 
-    log('Component.attach()', element);
-
     if (_connected)
       return;
 
@@ -132,8 +126,6 @@ internal.Component = (factory, element, properties = {}) => {
 
   const detach = () => {
 
-    log('Component.detach()', element);
-
     if (!_connected)
       return;
 
@@ -145,15 +137,11 @@ internal.Component = (factory, element, properties = {}) => {
 
   const render = (...args) => {
 
-    log('Component.render()', element);
-
     _render(element, ...args);
   };
 
 
   const attributeChanged = (name, oldValue, newValue) => {
-
-    // log('Component.attributeChanged()', name, oldValue, newValue);
 
     if (_syncingPropertyToAttribute)
       return;
@@ -169,8 +157,6 @@ internal.Component = (factory, element, properties = {}) => {
 
 
   };
-
-  log('Component()', element);
 
   const component = Object.freeze({
     isPwetComponent: true,
@@ -201,8 +187,6 @@ internal.parseAttributes = input => {
     const prop = input[name] || {};
     const { coerce, default: def, deserialize, serialize } = prop;
 
-    log('parseAttribute', name, prop);
-
     const attribute = typeof prop.attribute === 'object'
       ? Object.assign({}, prop.attribute)
       : { source: prop.attribute, target: prop.attribute };
@@ -225,8 +209,6 @@ internal.parseAttributes = input => {
 };
 
 internal.Component.define = (factory, options) => {
-
-  log('Component.define()');
 
   assert(isFunction(factory), `'factory' must be a function`);
 
@@ -262,21 +244,17 @@ internal.Component.define = (factory, options) => {
     }
     static get observedAttributes() {
 
-      // log('get observedAttributes', attributes);
-
       return Object.keys(attributes)
         .map(k => attributes[k].attribute)
         .filter(Boolean)
         .map(a => a.source);
     }
     get state() {
-      // log('get state')
 
       return Object.keys(attributes).reduce((state, key) => Object.assign(state, { [key]: this[key] }), {});
     }
     set state(newState) {
 
-      // log('set state', newState)
       Object.keys(newState).forEach(key => key in attributes && (this[key] = newState[key]));
     }
     connectedCallback() {
