@@ -9,7 +9,8 @@ export const clone = input =>
 
 export const noop = () => {};
 export const identity = arg => arg;
-export const not = (input) => !input;
+export const toggle = input => !input;
+export const not = toggle;
 
 export const isAttached = element => {
 
