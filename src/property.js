@@ -7,24 +7,25 @@ const internal = {};
 internal.Property = module.exports = (property) => {
 
   console.error('Property()', property);
+
   assert(isObject(property), `'property' must be an object`);
 
   let {
     name,
     attribute = false,
     coerce = identity,
-    value
+    defaultValue
   } = property;
 
   assert(isString(name), `'name' must be a string`);
   assert(isFunction(coerce), `'coerce' must be a function`);
 
-  if (!isUndefined(attribute)) {
+  if (attribute) {
 
     assert(Attribute.isAttribute(attribute), `'attribute' is not an Attribute object`);
 
     if (!isUndefined(attribute.defaultValue))
-      value = attribute.defaultValue;
+      defaultValue = attribute.defaultValue;
 
   }
 
@@ -32,6 +33,6 @@ internal.Property = module.exports = (property) => {
     name,
     attribute,
     coerce,
-    value
+    defaultValue
   }));
 };
