@@ -1,14 +1,15 @@
-import { noop } from './utilities';
+import { noop, identity } from './utilities';
 import { ByFilter, EqualFilter } from './filters';
-import { isFunction, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
-import { clone } from './utilities';
+import { isFunction, isArray, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
+import Property from './property';
+import Attribute from './attribute';
 
 
 const internal = {
   factories: []
 };
 
-internal.Component = (factory, element, properties = {}) => {
+internal.Component = (factory, element, override = {}) => {
 
   assert(internal.Component.get(factory), `'factory' must be a defined component factory`);
   assert(isElement(element), `'element' must be a HTMLElement`);
@@ -16,8 +17,10 @@ internal.Component = (factory, element, properties = {}) => {
   if (element._component !== void 0)
     return;
 
-  assert(isObject(properties), `'properties' must be an object`);
+  assert(isObject(override), `'override' must be an object`);
 
+
+  const _spanElement = document.createElement('span');
   let _syncingAttributeToProperty = false;
   let _syncingPropertyToAttribute = false;
   let _connected = false;
@@ -28,51 +31,61 @@ internal.Component = (factory, element, properties = {}) => {
   let _i = 0;
   let _updateArgs = [];
 
+
+
   const {
-    attributes = factory.attributes,
+    properties = factory.properties,
     render:_render = factory.render,
     attach:_attach = factory.attach,
     detach:_detach = factory.detach,
 
-  } = properties;
+  } = override;
+
+  const _attributes = properties.filter(property => property.attribute !== false);
 
   const _updateDebounced = (...args) => {
     _updateArgs = args;
     if (!_scheduled) {
       _scheduled = true;
-      spanElement.textContent = `textContent_${_i}`;
+      _spanElement.textContent = `textContent_${_i}`;
       _i += 1;
     }
   };
 
-  Object.defineProperties(element, Object.keys(attributes).reduce((properties, key) => {
 
-    const { attribute: { target }, coerce, default: def, serialize } = attributes[key];
-    const $value = Symbol(key);
+  Object.defineProperties(element, factory.properties.reduce((properties, property) => {
+
+    console.log('property', property);
+    const { name, coerce, defaultValue, attribute } = property;
+
+    let _value;
 
     return Object.assign(properties, {
-      [key]: {
+      [name]: {
         configurable: true,
         get() {
-          const val = element[$value];
-          return val == null ? def : val;
+          return _value == null ? property.value : _value;
         },
         set(newValue) {
 
-          element[$value] = coerce(newValue);
+          if (attribute) {
 
-          if (target && _syncingAttributeToProperty !== target) {
+            _value = property.coerce(newValue);
 
-            const serialized = serialize(newValue);
+            if (property.name && _syncingAttributeToProperty !== property.name) {
+              // console.log('set', attribute ? 'attribute' : 'property', newValue, attribute)
 
-            _syncingPropertyToAttribute = true;
+              const stringValue = attribute.stringify(newValue);
 
-            if (serialized == null)
-              element.removeAttribute(target);
-            else
-              element.setAttribute(target, serialized);
+              _syncingPropertyToAttribute = true;
 
-            _syncingPropertyToAttribute = false;
+              if (stringValue == null)
+                element.removeAttribute(attribute.name);
+              else
+                element.setAttribute(attribute.name, stringValue);
+
+              _syncingPropertyToAttribute = false;
+            }
           }
 
           _updateDebounced();
@@ -80,8 +93,6 @@ internal.Component = (factory, element, properties = {}) => {
       }
     });
   }, {}));
-
-  const spanElement = document.createElement('span');
 
   const observer = new MutationObserver(() => {
 
@@ -107,7 +118,8 @@ internal.Component = (factory, element, properties = {}) => {
     _updateArgs = null;
   });
 
-  observer.observe(spanElement, { childList: true });
+  observer.observe(_spanElement, { childList: true });
+
 
   const attach = () => {
 
@@ -134,27 +146,25 @@ internal.Component = (factory, element, properties = {}) => {
     _detach(element);
   };
 
-
   const render = (...args) => {
 
     _render(element, ...args);
   };
-
 
   const attributeChanged = (name, oldValue, newValue) => {
 
     if (_syncingPropertyToAttribute)
       return;
 
-    for (let propName in attributes) {
-      const { attribute: { source }, deserialize } = attributes[propName];
-      if (source === name) {
-        _syncingAttributeToProperty = propName;
-        element[propName] = newValue == null ? newValue : deserialize(newValue);
-        _syncingAttributeToProperty = null;
-      }
-    }
+    console.log('attributeChanged', properties)
+    properties.forEach(property => {
 
+      const { name, attribute: { parse } } = property;
+
+      _syncingAttributeToProperty = name;
+      element[name] = newValue == null ? newValue : parse(newValue);
+      _syncingAttributeToProperty = null;
+    })
 
   };
 
@@ -168,44 +178,41 @@ internal.Component = (factory, element, properties = {}) => {
 
   return element._component = component;
 };
+
 internal.Component.get = input => internal.factories.find(EqualFilter(input));
 
-internal.parseAttributes = input => {
+internal.parseProperties = input => {
 
-  const attributes = {};
+  const properties = [];
 
   if (!isObject(input))
-    return attributes;
+    return properties;
 
   const keys = Object.keys(input);
 
   if (isEmpty(keys))
-    return attributes;
+    return properties;
 
-  return keys.reduce((attributes, name) => {
+  return keys.reduce((properties, key) => {
 
-    const prop = input[name] || {};
-    const { coerce, default: def, deserialize, serialize } = prop;
+    let property = input[key];
 
-    const attribute = typeof prop.attribute === 'object'
-      ? Object.assign({}, prop.attribute)
-      : { source: prop.attribute, target: prop.attribute };
+    assert(isObject(property), `'property' must be an object`);
 
-    if (attribute.source === true)
-      attribute.source = name;
-    if (attribute.target === true)
-      attribute.target = name;
 
-    attributes[name] = {
-      attribute,
-      coerce: coerce || (v => v),
-      default: def,
-      deserialize: deserialize || (v => v),
-      serialize: serialize || (v => v)
-    };
+    if (Attribute.isAttribute(property))
+      property = {
+        attribute: property
+      };
 
-    return attributes;
-  }, input);
+    property.name = key;
+
+    property = Property(property);
+
+    properties.push(property);
+
+    return properties;
+  }, properties);
 };
 
 internal.Component.define = (factory, options) => {
@@ -221,7 +228,7 @@ internal.Component.define = (factory, options) => {
   assert(!internal.Component.get(factory), `That component factory is already defined`);
   assert(!internal.factories.find(ByFilter('tagName', tagName)), `'${tagName}' component is already defined`);
 
-  factory.attributes = internal.parseAttributes(factory.attributes);
+  const properties = factory.properties = internal.parseProperties(factory.properties);
 
   if (!isFunction(factory.attach))
     factory.attach = noop;
@@ -239,23 +246,26 @@ internal.Component.define = (factory, options) => {
 
       super();
 
-
-      this._component = factory(this, options && clone(options))
+      this._component = factory(this);
     }
     static get observedAttributes() {
 
-      return Object.keys(attributes)
-        .map(k => attributes[k].attribute)
-        .filter(Boolean)
-        .map(a => a.source);
+      return factory.properties.filter(property => property.attribute).map(property => property.name);
     }
     get state() {
 
-      return Object.keys(attributes).reduce((state, key) => Object.assign(state, { [key]: this[key] }), {});
+      return properties.reduce((state, property) => Object.assign(state, {
+        [property.name]: this[property.name]
+      }), {});
     }
     set state(newState) {
 
-      Object.keys(newState).forEach(key => key in attributes && (this[key] = newState[key]));
+      Object.keys(newState).forEach(key => {
+
+        if (properties.find(property => property.name === key))
+          this[key] = newState[key]
+
+      });
     }
     connectedCallback() {
 
@@ -266,6 +276,7 @@ internal.Component.define = (factory, options) => {
       this._component.detach(...arguments);
     }
     attributeChangedCallback(name, oldValue, newValue) {
+      console.log('attributeChangedCallback')
 
       this._component.attributeChanged(...arguments);
 

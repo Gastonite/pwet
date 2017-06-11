@@ -59,7 +59,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "0b5699e790cc993b9527"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "cef10e9579f7d3cba8bd"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
@@ -5869,6 +5869,98 @@ var isUnknownElement = exports.isUnknownElement = function isUnknownElement(inpu
 
 /***/ }),
 
+/***/ "../../src/attribute.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var _utilities = __webpack_require__("../../src/utilities.js");
+
+var _assertions = __webpack_require__("../../src/assertions.js");
+
+var internal = {};
+
+internal.empty = function (val) {
+  return val == null;
+};
+internal.nullOrType = function (type) {
+  return function (val) {
+    return internal.empty(val) ? null : type(val);
+  };
+};
+internal.zeroOrNumber = function (val) {
+  return internal.empty(val) ? 0 : Number(val);
+};
+internal.attribute = Object.freeze({ source: true });
+
+internal.Attribute = module.exports = function (attribute) {
+
+  (0, _assertions.assert)((0, _assertions.isObject)(attribute), '\'attribute\' must be an object');
+
+  var _attribute$stringify = attribute.stringify,
+      stringify = _attribute$stringify === undefined ? _utilities.identity : _attribute$stringify,
+      _attribute$parse = attribute.parse,
+      parse = _attribute$parse === undefined ? _utilities.identity : _attribute$parse,
+      defaultValue = attribute.defaultValue;
+
+
+  (0, _assertions.assert)((0, _assertions.isFunction)(stringify), '\'stringify\' must be a function');
+  (0, _assertions.assert)((0, _assertions.isFunction)(parse), '\'parse\' must be a function');
+
+  return Object.freeze({
+    isPwetAttribute: true,
+    stringify: stringify,
+    parse: parse,
+    defaultValue: defaultValue
+  });
+};
+
+internal.Attribute.isAttribute = function (input) {
+  return (0, _assertions.isObject)(input) && input.isPwetAttribute === true;
+};
+
+internal.Attribute.array = internal.Attribute({
+  coerce: function coerce(val) {
+    return Array.isArray(val) ? val : internal.empty(val) ? null : [val];
+  },
+  defaultValue: Object.freeze([]),
+  parse: JSON.parse,
+  stringify: JSON.stringify
+});
+
+internal.Attribute.boolean = internal.Attribute({
+  coerce: Boolean,
+  defaultValue: false,
+  parse: function parse(val) {
+    return !internal.empty(val);
+  },
+  stringify: function stringify(val) {
+    return val ? '' : null;
+  }
+});
+
+internal.Attribute.number = internal.Attribute({
+  defaultValue: 0,
+  coerce: internal.zeroOrNumber,
+  parse: internal.zeroOrNumber,
+  stringify: internal.nullOrType(Number)
+});
+
+internal.Attribute.object = internal.Attribute({
+  defaultValue: Object.freeze({}),
+  parse: JSON.parse,
+  stringify: JSON.stringify
+});
+
+internal.Attribute.string = internal.Attribute({
+  defaultValue: '',
+  coerce: String,
+  stringify: internal.nullOrType(String)
+});
+
+/***/ }),
+
 /***/ "../../src/component.js":
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5881,13 +5973,21 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
-
 var _utilities = __webpack_require__("../../src/utilities.js");
 
 var _filters = __webpack_require__("../../src/filters.js");
 
 var _assertions = __webpack_require__("../../src/assertions.js");
+
+var _property = __webpack_require__("../../src/property.js");
+
+var _property2 = _interopRequireDefault(_property);
+
+var _attribute = __webpack_require__("../../src/attribute.js");
+
+var _attribute2 = _interopRequireDefault(_attribute);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -5902,7 +6002,7 @@ var internal = {
 };
 
 internal.Component = function (factory, element) {
-  var properties = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var override = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
 
 
   (0, _assertions.assert)(internal.Component.get(factory), '\'factory\' must be a defined component factory');
@@ -5910,8 +6010,9 @@ internal.Component = function (factory, element) {
 
   if (element._component !== void 0) return;
 
-  (0, _assertions.assert)((0, _assertions.isObject)(properties), '\'properties\' must be an object');
+  (0, _assertions.assert)((0, _assertions.isObject)(override), '\'override\' must be an object');
 
+  var _spanElement = document.createElement('span');
   var _syncingAttributeToProperty = false;
   var _syncingPropertyToAttribute = false;
   var _connected = false;
@@ -5922,14 +6023,18 @@ internal.Component = function (factory, element) {
   var _i = 0;
   var _updateArgs = [];
 
-  var _properties$attribute = properties.attributes,
-      attributes = _properties$attribute === undefined ? factory.attributes : _properties$attribute,
-      _properties$render = properties.render,
-      _render = _properties$render === undefined ? factory.render : _properties$render,
-      _properties$attach = properties.attach,
-      _attach = _properties$attach === undefined ? factory.attach : _properties$attach,
-      _properties$detach = properties.detach,
-      _detach = _properties$detach === undefined ? factory.detach : _properties$detach;
+  var _override$properties = override.properties,
+      properties = _override$properties === undefined ? factory.properties : _override$properties,
+      _override$render = override.render,
+      _render = _override$render === undefined ? factory.render : _override$render,
+      _override$attach = override.attach,
+      _attach = _override$attach === undefined ? factory.attach : _override$attach,
+      _override$detach = override.detach,
+      _detach = _override$detach === undefined ? factory.detach : _override$detach;
+
+  var _attributes = properties.filter(function (property) {
+    return property.attribute !== false;
+  });
 
   var _updateDebounced = function _updateDebounced() {
     for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
@@ -5939,47 +6044,50 @@ internal.Component = function (factory, element) {
     _updateArgs = args;
     if (!_scheduled) {
       _scheduled = true;
-      spanElement.textContent = 'textContent_' + _i;
+      _spanElement.textContent = 'textContent_' + _i;
       _i += 1;
     }
   };
 
-  Object.defineProperties(element, Object.keys(attributes).reduce(function (properties, key) {
-    var _attributes$key = attributes[key],
-        target = _attributes$key.attribute.target,
-        coerce = _attributes$key.coerce,
-        def = _attributes$key.default,
-        serialize = _attributes$key.serialize;
+  Object.defineProperties(element, factory.properties.reduce(function (properties, property) {
 
-    var $value = Symbol(key);
+    console.log('property', property);
+    var name = property.name,
+        coerce = property.coerce,
+        defaultValue = property.defaultValue,
+        attribute = property.attribute;
 
-    return Object.assign(properties, _defineProperty({}, key, {
+
+    var _value = void 0;
+
+    return Object.assign(properties, _defineProperty({}, name, {
       configurable: true,
       get: function get() {
-        var val = element[$value];
-        return val == null ? def : val;
+        return _value == null ? property.value : _value;
       },
       set: function set(newValue) {
 
-        element[$value] = coerce(newValue);
+        if (attribute) {
 
-        if (target && _syncingAttributeToProperty !== target) {
+          _value = property.coerce(newValue);
 
-          var serialized = serialize(newValue);
+          if (property.name && _syncingAttributeToProperty !== property.name) {
+            // console.log('set', attribute ? 'attribute' : 'property', newValue, attribute)
 
-          _syncingPropertyToAttribute = true;
+            var stringValue = attribute.stringify(newValue);
 
-          if (serialized == null) element.removeAttribute(target);else element.setAttribute(target, serialized);
+            _syncingPropertyToAttribute = true;
 
-          _syncingPropertyToAttribute = false;
+            if (stringValue == null) element.removeAttribute(attribute.name);else element.setAttribute(attribute.name, stringValue);
+
+            _syncingPropertyToAttribute = false;
+          }
         }
 
         _updateDebounced();
       }
     }));
   }, {}));
-
-  var spanElement = document.createElement('span');
 
   var observer = new MutationObserver(function () {
 
@@ -5990,13 +6098,9 @@ internal.Component = function (factory, element) {
     var prev = _previousState;
     var next = _previousState = element.state;
 
-    // log('element.stateUpdatedCallback()', next);
-
     if (!prev || Object.keys(prev).some(function (key) {
       return prev[key] !== next[key];
     })) {
-
-      // log('element.stateChangedCallback()');
 
       var root = element;
 
@@ -6009,11 +6113,9 @@ internal.Component = function (factory, element) {
     _updateArgs = null;
   });
 
-  observer.observe(spanElement, { childList: true });
+  observer.observe(_spanElement, { childList: true });
 
   var attach = function attach() {
-
-    log('Component.attach()', element);
 
     if (_connected) return;
 
@@ -6028,8 +6130,6 @@ internal.Component = function (factory, element) {
 
   var detach = function detach() {
 
-    log('Component.detach()', element);
-
     if (!_connected) return;
 
     _connected = false;
@@ -6042,31 +6142,24 @@ internal.Component = function (factory, element) {
       args[_key2] = arguments[_key2];
     }
 
-    log('Component.render()', element);
-
     _render.apply(undefined, [element].concat(args));
   };
 
   var attributeChanged = function attributeChanged(name, oldValue, newValue) {
 
-    // log('Component.attributeChanged()', name, oldValue, newValue);
-
     if (_syncingPropertyToAttribute) return;
 
-    for (var propName in attributes) {
-      var _attributes$propName = attributes[propName],
-          source = _attributes$propName.attribute.source,
-          deserialize = _attributes$propName.deserialize;
+    console.log('attributeChanged', properties);
+    properties.forEach(function (property) {
+      var name = property.name,
+          parse = property.attribute.parse;
 
-      if (source === name) {
-        _syncingAttributeToProperty = propName;
-        element[propName] = newValue == null ? newValue : deserialize(newValue);
-        _syncingAttributeToProperty = null;
-      }
-    }
+
+      _syncingAttributeToProperty = name;
+      element[name] = newValue == null ? newValue : parse(newValue);
+      _syncingAttributeToProperty = null;
+    });
   };
-
-  log('Component()', element);
 
   var component = Object.freeze({
     isPwetComponent: true,
@@ -6078,57 +6171,42 @@ internal.Component = function (factory, element) {
 
   return element._component = component;
 };
+
 internal.Component.get = function (input) {
   return internal.factories.find((0, _filters.EqualFilter)(input));
 };
 
-internal.parseAttributes = function (input) {
+internal.parseProperties = function (input) {
 
-  var attributes = {};
+  var properties = [];
 
-  if (!(0, _assertions.isObject)(input)) return attributes;
+  if (!(0, _assertions.isObject)(input)) return properties;
 
   var keys = Object.keys(input);
 
-  if ((0, _assertions.isEmpty)(keys)) return attributes;
+  if ((0, _assertions.isEmpty)(keys)) return properties;
 
-  return keys.reduce(function (attributes, name) {
+  return keys.reduce(function (properties, key) {
 
-    var prop = input[name] || {};
-    var coerce = prop.coerce,
-        def = prop.default,
-        deserialize = prop.deserialize,
-        serialize = prop.serialize;
+    var property = input[key];
 
+    (0, _assertions.assert)((0, _assertions.isObject)(property), '\'property\' must be an object');
 
-    log('parseAttribute', name, prop);
-
-    var attribute = _typeof(prop.attribute) === 'object' ? Object.assign({}, prop.attribute) : { source: prop.attribute, target: prop.attribute };
-
-    if (attribute.source === true) attribute.source = name;
-    if (attribute.target === true) attribute.target = name;
-
-    attributes[name] = {
-      attribute: attribute,
-      coerce: coerce || function (v) {
-        return v;
-      },
-      default: def,
-      deserialize: deserialize || function (v) {
-        return v;
-      },
-      serialize: serialize || function (v) {
-        return v;
-      }
+    if (_attribute2.default.isAttribute(property)) property = {
+      attribute: property
     };
 
-    return attributes;
-  }, input);
+    property.name = key;
+
+    property = (0, _property2.default)(property);
+
+    properties.push(property);
+
+    return properties;
+  }, properties);
 };
 
 internal.Component.define = function (factory, options) {
-
-  log('Component.define()');
 
   (0, _assertions.assert)((0, _assertions.isFunction)(factory), '\'factory\' must be a function');
 
@@ -6143,7 +6221,7 @@ internal.Component.define = function (factory, options) {
   (0, _assertions.assert)(!internal.Component.get(factory), 'That component factory is already defined');
   (0, _assertions.assert)(!internal.factories.find((0, _filters.ByFilter)('tagName', tagName)), '\'' + tagName + '\' component is already defined');
 
-  factory.attributes = internal.parseAttributes(factory.attributes);
+  var properties = factory.properties = internal.parseProperties(factory.properties);
 
   if (!(0, _assertions.isFunction)(factory.attach)) factory.attach = _utilities.noop;
   if (!(0, _assertions.isFunction)(factory.detach)) factory.detach = _utilities.noop;
@@ -6161,7 +6239,7 @@ internal.Component.define = function (factory, options) {
 
       var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this));
 
-      _this._component = factory(_this, options && (0, _utilities.clone)(options));
+      _this._component = factory(_this);
       return _this;
     }
 
@@ -6184,6 +6262,8 @@ internal.Component.define = function (factory, options) {
       value: function attributeChangedCallback(name, oldValue, newValue) {
         var _component3;
 
+        console.log('attributeChangedCallback');
+
         (_component3 = this._component).attributeChanged.apply(_component3, arguments);
       }
     }, {
@@ -6191,30 +6271,28 @@ internal.Component.define = function (factory, options) {
       get: function get() {
         var _this2 = this;
 
-        // log('get state')
-
-        return Object.keys(attributes).reduce(function (state, key) {
-          return Object.assign(state, _defineProperty({}, key, _this2[key]));
+        return properties.reduce(function (state, property) {
+          return Object.assign(state, _defineProperty({}, property.name, _this2[property.name]));
         }, {});
       },
       set: function set(newState) {
         var _this3 = this;
 
-        // log('set state', newState)
         Object.keys(newState).forEach(function (key) {
-          return key in attributes && (_this3[key] = newState[key]);
+
+          if (properties.find(function (property) {
+            return property.name === key;
+          })) _this3[key] = newState[key];
         });
       }
     }], [{
       key: 'observedAttributes',
       get: function get() {
 
-        // log('get observedAttributes', attributes);
-
-        return Object.keys(attributes).map(function (k) {
-          return attributes[k].attribute;
-        }).filter(Boolean).map(function (a) {
-          return a.source;
+        return factory.properties.filter(function (property) {
+          return property.attribute;
+        }).map(function (property) {
+          return property.name;
         });
       }
     }]);
@@ -6308,69 +6386,54 @@ window.customElements && eval("/**\n * @license\n * Copyright (c) 2016 The Polym
 
 /***/ }),
 
-/***/ "../../src/props.js":
+/***/ "../../src/property.js":
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-var empty = function empty(val) {
-  return val == null;
-};
-var attribute = Object.freeze({ source: true });
-var createProp = function createProp(obj) {
-  return Object.freeze(Object.assign({ attribute: attribute }, obj));
-};
-var nullOrType = function nullOrType(type) {
-  return function (val) {
-    return empty(val) ? null : type(val);
-  };
-};
-var zeroOrNumber = function zeroOrNumber(val) {
-  return empty(val) ? 0 : Number(val);
-};
+var _utilities = __webpack_require__("../../src/utilities.js");
 
-var array = exports.array = createProp({
-  coerce: function coerce(val) {
-    return Array.isArray(val) ? val : empty(val) ? null : [val];
-  },
-  default: Object.freeze([]),
-  deserialize: JSON.parse,
-  serialize: JSON.stringify
-});
+var _assertions = __webpack_require__("../../src/assertions.js");
 
-var boolean = exports.boolean = createProp({
-  coerce: Boolean,
-  default: false,
-  deserialize: function deserialize(val) {
-    return !empty(val);
-  },
-  serialize: function serialize(val) {
-    return val ? '' : null;
+var _attribute = __webpack_require__("../../src/attribute.js");
+
+var _attribute2 = _interopRequireDefault(_attribute);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var internal = {};
+
+internal.Property = module.exports = function (property) {
+
+  console.error('Property()', property);
+  (0, _assertions.assert)((0, _assertions.isObject)(property), '\'property\' must be an object');
+
+  var name = property.name,
+      _property$attribute = property.attribute,
+      attribute = _property$attribute === undefined ? false : _property$attribute,
+      _property$coerce = property.coerce,
+      coerce = _property$coerce === undefined ? _utilities.identity : _property$coerce,
+      value = property.value;
+
+
+  (0, _assertions.assert)((0, _assertions.isString)(name), '\'name\' must be a string');
+  (0, _assertions.assert)((0, _assertions.isFunction)(coerce), '\'coerce\' must be a function');
+
+  if (!(0, _assertions.isUndefined)(attribute)) {
+
+    (0, _assertions.assert)(_attribute2.default.isAttribute(attribute), '\'attribute\' is not an Attribute object');
+
+    if (!(0, _assertions.isUndefined)(attribute.defaultValue)) value = attribute.defaultValue;
   }
-});
 
-var number = exports.number = createProp({
-  default: 0,
-  coerce: zeroOrNumber,
-  deserialize: zeroOrNumber,
-  serialize: nullOrType(Number)
-});
-
-var object = exports.object = createProp({
-  default: Object.freeze({}),
-  deserialize: JSON.parse,
-  serialize: JSON.stringify
-});
-
-var string = exports.string = createProp({
-  default: '',
-  coerce: String,
-  serialize: nullOrType(String)
-});
+  return Object.freeze(Object.assign(property, {
+    name: name,
+    attribute: attribute,
+    coerce: coerce,
+    value: value
+  }));
+};
 
 /***/ }),
 
@@ -6383,7 +6446,7 @@ var string = exports.string = createProp({
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.isAttached = exports.not = exports.identity = exports.noop = exports.clone = undefined;
+exports.isAttached = exports.not = exports.toggle = exports.identity = exports.noop = exports.clone = undefined;
 
 var _assertions = __webpack_require__("../../src/assertions.js");
 
@@ -6395,9 +6458,10 @@ var noop = exports.noop = function noop() {};
 var identity = exports.identity = function identity(arg) {
   return arg;
 };
-var not = exports.not = function not(input) {
+var toggle = exports.toggle = function toggle(input) {
   return !input;
 };
+var not = exports.not = toggle;
 
 var isAttached = exports.isAttached = function isAttached(element) {
 
@@ -6425,7 +6489,7 @@ var _component = __webpack_require__("../../src/component.js");
 
 var _component2 = _interopRequireDefault(_component);
 
-var _props = __webpack_require__("../../src/props.js");
+var _attribute = __webpack_require__("../../src/attribute.js");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -6435,7 +6499,7 @@ var Counter = function Counter(element) {
 
   var attach = function attach(element) {
 
-    log('Counter.attach()', element);
+    log('Counter.attach()', element.count);
 
     _interval = setInterval(function () {
       return ++element.count;
@@ -6451,7 +6515,7 @@ var Counter = function Counter(element) {
 
   var render = function render(element, state) {
 
-    log('Counter.render()', element, state);
+    log('Counter.render()', element);
 
     element.innerHTML = JSON.stringify(state, null, 2);
   };
@@ -6463,8 +6527,8 @@ var Counter = function Counter(element) {
   });
 };
 
-Counter.attributes = {
-  count: _props.number
+Counter.properties = {
+  count: _attribute.number
 };
 
 Counter.tagName = 'x-counter';

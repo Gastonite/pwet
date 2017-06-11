@@ -1,5 +1,5 @@
 import Component from '../../src/component';
-import { number } from '../../src/props';
+import { number } from '../../src/attribute';
 
 
 const Counter = element => {
@@ -8,7 +8,7 @@ const Counter = element => {
 
   const attach = element => {
 
-    log('Counter.attach()', element);
+    log('Counter.attach()', element.count);
 
     _interval = setInterval(() => ++element.count, 1000);
   };
@@ -20,10 +20,9 @@ const Counter = element => {
     clearInterval(_interval);
   };
 
-
   const render = (element, state) => {
 
-    log('Counter.render()', element, state);
+    log('Counter.render()', element);
 
     element.innerHTML = JSON.stringify(state, null, 2)
   };
@@ -35,7 +34,7 @@ const Counter = element => {
   });
 };
 
-Counter.attributes = {
+Counter.properties = {
   count: number
 };
 

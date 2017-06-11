@@ -2,7 +2,6 @@
 
 Utility for building Webcomponents with factory functions :)
 
-## Example
 ### Show example
 
 show the already builded example:
@@ -10,7 +9,7 @@ show the already builded example:
 ```examples/counter/build/index.html``` 
 
 
-### Build using webpack-dev-server
+### Build example using webpack-dev-server
 
 ```
 npm install && npm run demo
