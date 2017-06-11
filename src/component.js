@@ -98,7 +98,10 @@ internal.Component = (factory, element, override = {}) => {
 
     _attach(element);
 
-    component.update();
+    if (!_rendered) {
+      console.log('not rendered');
+      component.update();
+    }
   };
 
   const update = (state = {}) => {
