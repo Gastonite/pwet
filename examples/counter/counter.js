@@ -1,37 +1,36 @@
-import Component from '../../src/component';
 import { number } from '../../src/attribute';
 
 
-const Counter = element => {
+const Counter = component => {
 
+  const { element } = component;
   let _interval;
 
-  const attach = element => {
+  const attach = (state) => {
 
-    log('Counter.attach()', element.count);
+    log('Counter.attach()', state);
 
     _interval = setInterval(() => ++element.count, 1000);
   };
 
-  const detach = element => {
+  const detach = (state) => {
 
-    log('Counter.detach()', element);
+    log('Counter.detach()', state);
 
     clearInterval(_interval);
   };
 
-  const render = (element, state) => {
-
-    log('Counter.render()', element);
-
-    element.innerHTML = JSON.stringify(state, null, 2)
-  };
-
-  return Component(Counter, element, {
+  return {
     attach,
-    detach,
-    render
-  });
+    detach
+  };
+};
+
+Counter.render = (element, state) => {
+
+  log('Counter.render()', state);
+
+  element.innerHTML = JSON.stringify(state, null, 2)
 };
 
 Counter.properties = {

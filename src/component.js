@@ -6,7 +6,8 @@ import Attribute from './attribute';
 
 
 const internal = {
-  factories: []
+  factories: [],
+  allowedMethods: ['attach', 'detach', 'attributeChanged', 'update', 'render']
 };
 
 internal.parseProperties = input => {
@@ -42,7 +43,7 @@ internal.parseProperties = input => {
     return properties;
   }, properties);
 };
-
+internal.isAllowedMethod = key => internal.allowedMethods.includes(key);
 internal.defaultUpdater = (element, newState, update) => {
 
   update(newState);
@@ -74,6 +75,13 @@ internal.Component = (factory, element, override = {}) => {
     detach:_detach = factory.detach,
   } = override;
 
+  const _hooks = {
+    update: factory.update.bind(null, element),
+    render: factory.render.bind(null, element),
+    attach: factory.attach.bind(null, element),
+    detach: factory.detach.bind(null, element),
+  };
+
   const _properties = factory.properties.map((property) => {
 
     let defaultValue = property.defaultValue;
@@ -84,9 +92,7 @@ internal.Component = (factory, element, override = {}) => {
     return Object.assign({}, property, { defaultValue });
   });
 
-  const _attributes = _properties.filter(property => property.attribute !== false);
-
-  const attach = () => {
+  const attach = (...args) => {
 
     if (_connected)
       return;
@@ -96,10 +102,9 @@ internal.Component = (factory, element, override = {}) => {
     if (factory.shadowRoot)
       _shadowRoot = element.attachShadow(factory.shadowRoot);
 
-    _attach(element);
+    _hooks.attach();
 
     if (!_rendered) {
-      console.log('not rendered');
       component.update();
     }
   };
@@ -109,7 +114,7 @@ internal.Component = (factory, element, override = {}) => {
     assert(isObject(state), `'state' must be an object`);
     const newState = Object.assign(element.state, state);
 
-    _update(element, newState, (state, render = true) => {
+    _hooks.update(newState, (state, render = true) => {
 
       Object.assign(_state, newState);
 
@@ -120,24 +125,24 @@ internal.Component = (factory, element, override = {}) => {
     });
   };
 
-  const detach = () => {
+  const detach = (...args) => {
 
     if (!_connected)
       return;
 
     _connected = false;
 
-    _detach(element);
+    _hooks.detach();
   };
 
-  const render = (...args) => {
+  const render = (state) => {
 
     let root = element;
 
     if (factory.shadowRoot)
       root = _shadowRoot;
 
-    _render(element, ...args);
+    _hooks.render(state);
 
     _rendered = true;
   };
@@ -158,8 +163,9 @@ internal.Component = (factory, element, override = {}) => {
 
   };
 
-  const component = Object.freeze({
+  const component = element._component = Object.freeze({
     isPwetComponent: true,
+    element,
     attach,
     detach,
     update,
@@ -195,16 +201,32 @@ internal.Component = (factory, element, override = {}) => {
       }
     });
 
-    return Object.assign(state, {
-      [name]: /*element.getAttribute(name) || */defaultValue
-    });
+    let value = defaultValue;
+
+    if (property.attribute && !isUndefined(element.dataset[name]))
+      value = element.dataset[name];
+
+    return Object.assign(state, { [name]: value });
   }, {});
 
+  // element.update = component.update;
+  // element.render = component.render;
 
-  element.update = component.update;
-  element.render = component.render;
+  const overriden = factory(component);
 
-  return element._component = component;
+  Object.keys(overriden).filter(internal.isAllowedMethod).forEach(key => {
+
+    const method = overriden[key];
+
+    assert(isFunction(method), `'${key}' must be a function`);
+
+    const _originalMethod = component[key];
+
+    _hooks[key] = method;
+
+  });
+
+  return Object.freeze(component);
 };
 
 internal.Component.get = input => internal.factories.find(EqualFilter(input));
@@ -228,6 +250,8 @@ internal.Component.define = (factory, options) => {
     factory.attach = noop;
   if (!isFunction(factory.detach))
     factory.detach = noop;
+  if (!isFunction(factory.attributeChanged))
+    factory.attributeChanged = noop;
   if (!isFunction(factory.update))
     factory.update = internal.defaultUpdater;
   if (!isFunction(factory.render))
@@ -239,7 +263,8 @@ internal.Component.define = (factory, options) => {
     constructor() {
 
       super();
-      this._component = factory(this);
+
+      this._component = internal.Component(factory, this);
     }
     static get observedAttributes() {
 

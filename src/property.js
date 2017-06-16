@@ -24,7 +24,7 @@ internal.Property = module.exports = (property) => {
 
     assert(Attribute.isAttribute(attribute), `'attribute' is not an Attribute object`);
 
-    if (!isUndefined(attribute.defaultValue))
+    if (isUndefined(defaultValue) && !isUndefined(attribute.defaultValue))
       defaultValue = attribute.defaultValue;
 
   }
