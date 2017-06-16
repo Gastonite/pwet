@@ -7,7 +7,7 @@ import Attribute from './attribute';
 
 const internal = {
   factories: [],
-  allowedMethods: ['attach', 'detach', 'update', 'render']
+  allowedHooks: ['attach', 'detach', 'update', 'render']
 };
 
 internal.parseProperties = input => {
@@ -43,7 +43,7 @@ internal.parseProperties = input => {
     return properties;
   }, properties);
 };
-internal.isAllowedMethod = key => internal.allowedMethods.includes(key);
+internal.isAllowedHook = key => internal.allowedHooks.includes(key);
 internal.defaultUpdater = (element, newState, update) => {
 
   update(newState);
@@ -198,7 +198,7 @@ internal.Component = (factory, element) => {
   if (!isObject(overriden) || isNull(overriden))
     return component;
 
-  Object.keys(overriden).filter(internal.isAllowedMethod).forEach(key => {
+  Object.keys(overriden).filter(internal.isAllowedHook).forEach(key => {
 
     const method = overriden[key];
 
