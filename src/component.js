@@ -1,13 +1,13 @@
 import { noop, identity } from './utilities';
 import { ByFilter, EqualFilter } from './filters';
-import { isFunction, isArray, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
+import { isFunction, isNull, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
 import Property from './property';
 import Attribute from './attribute';
 
 
 const internal = {
   factories: [],
-  allowedMethods: ['attach', 'detach', 'attributeChanged', 'update', 'render']
+  allowedMethods: ['attach', 'detach', 'update', 'render']
 };
 
 internal.parseProperties = input => {
@@ -49,7 +49,7 @@ internal.defaultUpdater = (element, newState, update) => {
   update(newState);
 };
 
-internal.Component = (factory, element, override = {}) => {
+internal.Component = (factory, element) => {
 
   assert(internal.Component.get(factory), `'factory' must be a defined component factory`);
   assert(isElement(element), `'element' must be a HTMLElement`);
@@ -57,23 +57,9 @@ internal.Component = (factory, element, override = {}) => {
   if (element._component !== void 0)
     return;
 
-  assert(isObject(override), `'override' must be an object`);
-
-  let _syncingAttributeToProperty = false;
-  let _syncingPropertyToAttribute = false;
   let _connected = false;
-  let _updating = false;
   let _shadowRoot = false;
   let _rendered = false;
-  let _previousState;
-  let _updateArgs = [];
-
-  const {
-    update:_update = factory.update,
-    render:_render = factory.render,
-    attach:_attach = factory.attach,
-    detach:_detach = factory.detach,
-  } = override;
 
   const _hooks = {
     update: factory.update.bind(null, element),
@@ -92,7 +78,11 @@ internal.Component = (factory, element, override = {}) => {
     return Object.assign({}, property, { defaultValue });
   });
 
+  const _attributes = _properties.filter(property => property.attribute !== false);
+
   const attach = (...args) => {
+
+    console.log('attach', args);
 
     if (_connected)
       return;
@@ -149,18 +139,12 @@ internal.Component = (factory, element, override = {}) => {
 
   const attributeChanged = (name, oldValue, newValue) => {
 
-    if (_syncingPropertyToAttribute)
-      return;
-
-    _properties.forEach(property => {
+    _attributes.forEach(property => {
 
       const { name, attribute: { parse } } = property;
 
-      _syncingAttributeToProperty = name;
       element[name] = newValue == null ? newValue : parse(newValue);
-      _syncingAttributeToProperty = null;
     })
-
   };
 
   const component = element._component = Object.freeze({
@@ -209,10 +193,10 @@ internal.Component = (factory, element, override = {}) => {
     return Object.assign(state, { [name]: value });
   }, {});
 
-  // element.update = component.update;
-  // element.render = component.render;
-
   const overriden = factory(component);
+
+  if (!isObject(overriden) || isNull(overriden))
+    return component;
 
   Object.keys(overriden).filter(internal.isAllowedMethod).forEach(key => {
 
@@ -220,13 +204,10 @@ internal.Component = (factory, element, override = {}) => {
 
     assert(isFunction(method), `'${key}' must be a function`);
 
-    const _originalMethod = component[key];
-
     _hooks[key] = method;
-
   });
 
-  return Object.freeze(component);
+  return component;
 };
 
 internal.Component.get = input => internal.factories.find(EqualFilter(input));
@@ -250,8 +231,6 @@ internal.Component.define = (factory, options) => {
     factory.attach = noop;
   if (!isFunction(factory.detach))
     factory.detach = noop;
-  if (!isFunction(factory.attributeChanged))
-    factory.attributeChanged = noop;
   if (!isFunction(factory.update))
     factory.update = internal.defaultUpdater;
   if (!isFunction(factory.render))
@@ -264,7 +243,7 @@ internal.Component.define = (factory, options) => {
 
       super();
 
-      this._component = internal.Component(factory, this);
+      internal.Component(factory, this);
     }
     static get observedAttributes() {
 
@@ -287,11 +266,11 @@ internal.Component.define = (factory, options) => {
     }
     connectedCallback() {
 
-      this._component.attach(...arguments);
+      this._component.attach();
     }
     disconnectedCallback() {
 
-      this._component.detach(...arguments);
+      this._component.detach();
     }
     attributeChangedCallback(name, oldValue, newValue) {
 
