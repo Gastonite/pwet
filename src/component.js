@@ -207,6 +207,8 @@ internal.Component = (factory, element) => {
     _hooks[key] = method;
   });
 
+  assert(_hooks.render !== noop, `'render' method is required`);
+
   return component;
 };
 
