@@ -1,4 +1,4 @@
-import { number } from '../../src/attribute';
+import Attribute from '../../src/attribute';
 
 
 const Counter = component => {
@@ -6,11 +6,21 @@ const Counter = component => {
   const { element } = component;
   let _interval;
 
-  const attach = (state) => {
+  const attach = (done) => {
 
-    log('Counter.attach()', state);
+    _interval = setInterval(() => {
+      const state = component.state;
 
-    _interval = setInterval(() => ++element.count, 1000);
+      log('Counter.attach() before', state.count);
+      state.count++;
+      log('Counter.attach() after', state.count);
+
+      component.state = state;
+    }, 1000);
+
+
+    setTimeout(detach, 2000)
+    done();
   };
 
   const detach = (state) => {
@@ -26,15 +36,19 @@ const Counter = component => {
   };
 };
 
-Counter.render = (element, state) => {
+Counter.render = (component) => {
 
-  log('Counter.render()', state);
+  // log('Counter.render() properties:', JSON.stringify(component.properties), 'state:', JSON.stringify(component.state));
 
-  element.innerHTML = JSON.stringify(state, null, 2)
+  component.element.innerHTML = JSON.stringify(component.state, null, 2)
 };
 
 Counter.properties = {
-  count: number
+  yo: {},
+  count: {
+    attribute: Attribute.number,
+    isPartOfState: true
+  }
 };
 
 Counter.tagName = 'x-counter';

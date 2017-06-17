@@ -1,5 +1,5 @@
 import { identity } from './utilities';
-import { assert, isString, isObject, isFunction } from './assertions';
+import { assert, isUndefined, isObject, isFunction } from './assertions';
 
 const internal = {};
 
@@ -17,16 +17,19 @@ internal.Attribute = module.exports = (attribute) => {
   let {
     stringify = identity,
     parse = identity,
-    defaultValue
+    coerce = identity,
+    defaultValue,
   } = attribute;
 
   assert(isFunction(stringify), `'stringify' must be a function`);
   assert(isFunction(parse), `'parse' must be a function`);
+  assert(isFunction(coerce), `'coerce' must be a function`);
 
   return Object.freeze({
     isPwetAttribute: true,
     stringify,
     parse,
+    coerce,
     defaultValue
   });
 };

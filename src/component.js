@@ -7,7 +7,7 @@ import Attribute from './attribute';
 
 const internal = {
   factories: [],
-  allowedHooks: ['attach', 'detach', 'update', 'render']
+  allowedHooks: ['attach', 'detach', 'reload', 'update', 'render']
 };
 
 internal.parseProperties = input => {
@@ -44,9 +44,17 @@ internal.parseProperties = input => {
   }, properties);
 };
 internal.isAllowedHook = key => internal.allowedHooks.includes(key);
-internal.defaultUpdater = (element, newState, update) => {
 
-  update(newState);
+internal.defaultsHooks = {
+  attach(component, attach) {
+    attach();
+  },
+  update(component, newState, update) {
+    update();
+  },
+  reload(component, newProperties, reload) {
+    reload();
+  }
 };
 
 internal.Component = (factory, element) => {
@@ -57,143 +65,177 @@ internal.Component = (factory, element) => {
   if (element._component !== void 0)
     return;
 
-  let _connected = false;
   let _shadowRoot = false;
-  let _rendered = false;
+  let _isAttached = false;
+  let _isRendered = false;
+  let _isUpdating = false;
+  let _state = {};
+  let _properties = {};
 
-  const _hooks = {
-    update: factory.update.bind(null, element),
-    render: factory.render.bind(null, element),
-    attach: factory.attach.bind(null, element),
-    detach: factory.detach.bind(null, element),
-  };
-
-  const _properties = factory.properties.map((property) => {
-
-    let defaultValue = property.defaultValue;
-
-    if (isFunction(defaultValue))
-      defaultValue = defaultValue.bind(null, element);
-
-    return Object.assign({}, property, { defaultValue });
-  });
-
-  const _attributes = _properties.filter(property => property.attribute !== false);
 
   const attach = (...args) => {
 
-    console.log('attach', args);
-
-    if (_connected)
+    if (_isAttached)
       return;
-
-    _connected = true;
 
     if (factory.shadowRoot)
       _shadowRoot = element.attachShadow(factory.shadowRoot);
 
-    _hooks.attach();
+    _hooks.attach(() => {
 
-    if (!_rendered) {
-      component.update();
-    }
+      _isAttached = true;
+
+      _render();
+    });
   };
 
-  const update = (state = {}) => {
+  const _update = (newState = {}) => {
 
-    assert(isObject(state), `'state' must be an object`);
-    const newState = Object.assign(element.state, state);
+    assert(isObject(newState) && !isNull(newState), `'newState' must be an object`);
 
-    _hooks.update(newState, (state, render = true) => {
+    assert(_state !== newState, `'newState' must not be equal to previous state`);
 
-      Object.assign(_state, newState);
+    _isUpdating = true;
 
-      if (!render)
+    _hooks.update(newState, (render = true) => {
+
+      _state = newState;
+
+      if (render !== true)
         return;
 
-      component.render(state);
+      _render();
+
+      _isUpdating = false;
     });
   };
 
   const detach = (...args) => {
 
-    if (!_connected)
+    if (!_isAttached)
       return;
 
-    _connected = false;
+    _isAttached = false;
 
     _hooks.detach();
   };
 
-  const render = (state) => {
+  const _render = () => {
+
+    if (!_isAttached) {
+      assert(!_isRendered, 'WTF!!!!');
+      return;
+    }
 
     let root = element;
 
     if (factory.shadowRoot)
       root = _shadowRoot;
 
-    _hooks.render(state);
+    _hooks.render();
 
-    _rendered = true;
+
+    _isRendered = true;
   };
 
   const attributeChanged = (name, oldValue, newValue) => {
 
+
+    const properties = component.properties;
+
     _attributes.forEach(property => {
 
-      const { name, attribute: { parse } } = property;
+      if (name === property.name)
+        properties[name] = property.attribute.parse(newValue);
 
-      element[name] = newValue == null ? newValue : parse(newValue);
-    })
+    });
+
+    component.properties = properties
   };
 
-  const component = element._component = Object.freeze({
+  const component = element._component = {
     isPwetComponent: true,
     element,
     attach,
     detach,
-    update,
-    render,
     attributeChanged
-  });
+  };
 
-  Object.defineProperty(element, 'state', {
+  const _hooks = {
+    reload: factory.reload.bind(null, component),
+    update: factory.update.bind(null, component),
+    render: factory.render.bind(null, component),
+    attach: factory.attach.bind(null, component),
+    detach: factory.detach.bind(null, component),
+  };
+
+  const _attributes = factory.properties.filter(property => property.attribute !== false);
+
+  Object.defineProperty(component, 'state', {
     get() {
       return Object.assign({}, _state);
     },
     set(newState) {
 
-      assert(isObject(newState), `'state' must be an object`);
-
-      component.update(newState);
+      if (!_isUpdating)
+        _update(newState);
     }
   });
 
-  const _state = _properties.reduce((state, property) => {
+  Object.defineProperty(component, 'properties', {
+    get() {
+      return Object.assign({}, _properties);
+    },
+    set(newProperties) {
 
-    const { name, coerce, defaultValue, attribute } = property;
+      assert(isObject(newProperties) && !isNull(newProperties), `'newProperties' must be an object`);
+
+
+      _hooks.reload(newProperties, () => {
+
+        const state = component.state;
+
+        newProperties = factory.properties.reduce((properties, { name, coerce, defaultValue, isPartOfState }) => {
+
+          let value = newProperties[name];
+
+          value = isUndefined(value) ? defaultValue : coerce(value);
+
+          if (isFunction(value))
+            value = value.bind(null, component);
+
+          if (isPartOfState)
+            state[name] = value;
+
+          _properties[name] = value;
+
+          return Object.assign(properties, { [name]: value });
+        }, {});
+
+        component.state = state;
+      });
+    }
+  });
+
+
+  component.properties = _attributes.reduce((properties, { name }) => {
 
     Object.defineProperty(element, name, {
       get() {
-        return element.state[name];
+        return component.properties[name];
       },
       set(newValue) {
 
-        element.state = Object.assign(element.state, {
+        component.properties = Object.assign(component.properties, {
           [name]: newValue
         });
       }
     });
 
-    let value = defaultValue;
-
-    if (property.attribute && !isUndefined(element.dataset[name]))
-      value = element.dataset[name];
-
-    return Object.assign(state, { [name]: value });
+    return Object.assign(properties, { [name]: element.dataset[name] });
   }, {});
 
-  const overriden = factory(component);
+  const overriden = factory(Object.freeze(component));
 
   if (!isObject(overriden) || isNull(overriden))
     return component;
@@ -227,18 +269,22 @@ internal.Component.define = (factory, options) => {
   assert(!internal.Component.get(factory), `That component factory is already defined`);
   assert(!internal.factories.find(ByFilter('tagName', tagName)), `'${tagName}' component is already defined`);
 
-  const properties = factory.properties = internal.parseProperties(factory.properties);
+  factory.properties = internal.parseProperties(factory.properties);
 
   if (!isFunction(factory.attach))
-    factory.attach = noop;
+    factory.attach = internal.defaultsHooks.attach;
+  if (!isFunction(factory.reload))
+    factory.reload = internal.defaultsHooks.reload;
   if (!isFunction(factory.detach))
     factory.detach = noop;
   if (!isFunction(factory.update))
-    factory.update = internal.defaultUpdater;
+    factory.update = internal.defaultsHooks.update;
   if (!isFunction(factory.render))
     factory.render = noop;
 
   internal.factories.push(factory);
+
+  const attributesNames = factory.properties.filter(property => property.attribute).map(property => property.name);
 
   customElements.define(tagName, class extends HTMLElement {
     constructor() {
@@ -249,22 +295,7 @@ internal.Component.define = (factory, options) => {
     }
     static get observedAttributes() {
 
-      return factory.properties.filter(property => property.attribute).map(property => property.name);
-    }
-    get state() {
-
-      return properties.reduce((state, property) => Object.assign(state, {
-        [property.name]: this[property.name]
-      }), {});
-    }
-    set state(newState) {
-
-      Object.keys(newState).forEach(key => {
-
-        if (properties.find(property => property.name === key))
-          this[key] = newState[key]
-
-      });
+      return attributesNames;
     }
     connectedCallback() {
 

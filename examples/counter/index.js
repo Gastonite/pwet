@@ -13,16 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const property = document.getElementById('property');
   const attribute = document.getElementById('attribute');
 
-  const counter1 = document.createElement('x-counter');
-  const counter2 = document.createElement('x-counter');
-  const counter3 = document.createElement('x-counter');
-
-
-  counter2.count = 1000;
-  counter3.setAttribute('count', '1000');
-
-  noState.appendChild(counter1);
-  property.appendChild(counter2);
-  attribute.appendChild(counter3);
+  // const counter1 = document.createElement('x-counter');
+  // const counter2 = document.createElement('x-counter');
+  // const counter3 = document.createElement('x-counter');
+  //
+  // counter2.count = 1000;
+  // counter3.setAttribute('count', '1000');
+  //
+  // noState.appendChild(counter1);
+  // property.appendChild(counter2);
+  // attribute.appendChild(counter3);
 
 });
