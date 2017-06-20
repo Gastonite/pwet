@@ -144,12 +144,15 @@ internal.Component = (factory, element) => {
 
     newProperties = factory.properties.reduce((properties, { name, coerce, defaultValue }) => {
 
-      let value = newProperties[name];
-
-      value = isUndefined(value) ? defaultValue : coerce(value);
-
-      return Object.assign(properties, { [name]: value });
-    }, newProperties);
+      return Object.assign(properties, {
+        [name]:
+          !isUndefined(newProperties[name])
+            ? coerce(newProperties[name])
+            : (!isUndefined(_properties[name])
+              ?_properties[name]
+              : defaultValue)
+      });
+    }, {});
 
     _hooks.initialize(newProperties, (shouldRender = false) => {
 

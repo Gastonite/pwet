@@ -59,7 +59,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "de1baf6440ed4c60c002"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "fa701e61c9609826a1b6"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
@@ -7995,12 +7995,8 @@ internal.Component = function (factory, element) {
           defaultValue = _ref.defaultValue;
 
 
-      var value = newProperties[name];
-
-      value = (0, _assertions.isUndefined)(value) ? defaultValue : coerce(value);
-
-      return Object.assign(properties, _defineProperty({}, name, value));
-    }, newProperties);
+      return Object.assign(properties, _defineProperty({}, name, !(0, _assertions.isUndefined)(newProperties[name]) ? coerce(newProperties[name]) : !(0, _assertions.isUndefined)(_properties[name]) ? _properties[name] : defaultValue));
+    }, {});
 
     _hooks.initialize(newProperties, function () {
       var shouldRender = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
