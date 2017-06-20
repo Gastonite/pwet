@@ -71,6 +71,7 @@ internal.Component = (factory, element) => {
   let _isInitializing = false;
   let _state = factory.initialState();
   let _properties = {};
+  const _callbacks = [];
 
   const attributeChanged = (name, oldValue, newValue) => {
 
@@ -86,15 +87,14 @@ internal.Component = (factory, element) => {
     component.properties = properties
   };
 
-  const _callbacks = [];
 
-  const editState = (partialState, callback) => {
+  const editState = (partialState/*, callback*/) => {
     // console.log('Component.editState()');
 
     assert(isObject(partialState) && !isNull(partialState), `'partialState' must be an object`);
 
-    if (!isUndefined(callback))
-      _callbacks.push(callback);
+    // if (!isUndefined(callback))
+    //   _callbacks.push(callback);
 
     const state = component.state;
 
@@ -146,10 +146,9 @@ internal.Component = (factory, element) => {
 
       let value = newProperties[name];
 
-      if (isUndefined(value))
-        return properties;
+      value = isUndefined(value) ? defaultValue : coerce(value);
 
-      return Object.assign(properties, { [name]: coerce(value) });
+      return Object.assign(properties, { [name]: value });
     }, newProperties);
 
     _hooks.initialize(newProperties, (shouldRender = false) => {
@@ -182,11 +181,11 @@ internal.Component = (factory, element) => {
 
       _state = newState;
 
-      const shift = _callbacks.shift.bind(_callbacks);
-      const stateCopy = Object.assign({}, newState);
-
-      while (_callbacks.length > 0)
-        shift()(stateCopy);
+      // const shift = _callbacks.shift.bind(_callbacks);
+      // const stateCopy = Object.assign({}, newState);
+      //
+      // while (_callbacks.length > 0)
+      //   shift()(stateCopy);
 
       if (shouldRender)
         component.render();
@@ -266,6 +265,8 @@ internal.Component = (factory, element) => {
 
   assert(_hooks.render !== noop, `'render' method is required`);
 
+
+  // first initialization
   component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {
 
     Object.defineProperty(element, name, {
