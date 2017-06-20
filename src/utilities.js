@@ -1,3 +1,4 @@
+
 import { isObject, isArray } from './assertions';
 
 export const clone = input =>
@@ -11,7 +12,6 @@ export const noop = () => {};
 export const identity = arg => arg;
 export const toggle = input => !input;
 export const not = toggle;
-
 export const isAttached = element => {
 
   if (element === document)

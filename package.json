@@ -42,5 +42,8 @@
     "stylus-loader": "^3.0.1",
     "webpack": "^2.5.1",
     "webpack-dev-server": "^2.4.5"
+  },
+  "devDependencies": {
+    "lodash.isequal": "^4.5.0"
   }
 }

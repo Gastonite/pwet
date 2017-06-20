@@ -4,51 +4,76 @@ import Attribute from '../../src/attribute';
 const Counter = component => {
 
   const { element } = component;
+  console.log('Counter() ', component.state);
+
+
   let _interval;
 
-  const attach = (done) => {
-
-    _interval = setInterval(() => {
-      const state = component.state;
-
-      log('Counter.attach() before', state.count);
-      state.count++;
-      log('Counter.attach() after', state.count);
-
-      component.state = state;
-    }, 1000);
+  const initialize = (newProperties, initialize) => {
 
 
-    setTimeout(detach, 2000)
-    done();
+    console.log('Counter.initialize() before', newProperties);
+
+    const { state } = component;
+
+    if (newProperties.start !== state.count)
+      component.editState({ count: newProperties.start });
+
+    initialize(!component.isRendered);
+
+    console.log('Counter.initialize() after', component.state);
+  };
+
+
+  const _incrementBy = value => () => {
+    const { state } = component;
+
+    component.editState({
+      count: state.count + element.by
+    });
+  };
+
+  const attach = (attach) => {
+    console.log('Counter.attach()', component.state);
+
+    _interval = setInterval(_incrementBy(element.by), 1000);
+
+    attach(true);
+
+    setTimeout(detach, 6000)
   };
 
   const detach = (state) => {
-
-    log('Counter.detach()', state);
+    console.log('Counter.detach()', state);
 
     clearInterval(_interval);
   };
 
   return {
+    initialize,
     attach,
     detach
   };
 };
 
 Counter.render = (component) => {
-
-  // log('Counter.render() properties:', JSON.stringify(component.properties), 'state:', JSON.stringify(component.state));
+  console.log('Counter.render()', component.state);
 
   component.element.innerHTML = JSON.stringify(component.state, null, 2)
 };
 
 Counter.properties = {
-  yo: {},
-  count: {
+  start: {
+    attribute: Attribute.number
+  },
+  by: {
     attribute: Attribute.number,
-    isPartOfState: true
+    defaultValue: 1
   }
+};
+
+Counter.initialState = {
+  count: 0
 };
 
 Counter.tagName = 'x-counter';

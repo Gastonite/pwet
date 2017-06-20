@@ -2,13 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PWET : Simple counter component example</title>
+    <title>Pwet : Counter component examples</title>
     <style>
         body {
             font-size: 18px;
         }
         h1 {
-            font-size: 24px;
+            font-size: 32px;
+        }
+
+        h2, strong {
+            font-size: 18px;
         }
         ul {
             list-style: none;
@@ -23,42 +27,62 @@
 <h1>Simple counter component example</h1>
 <ul>
     <li>
-        <strong>Already in the document : </strong>
+        <h2>Already in the DOM :</h2>
         <ul>
-            <!--<li>-->
-                <!--<strong>no state</strong>-->
-                <!--<small>defaults to 0</small>-->
-                <!--=>-->
-                <!--<x-counter></x-counter>-->
-            <!--</li>-->
             <li>
-                <strong>by attribute</strong>
-                <small>count="42"</small>
+                <strong>No attribute provided</strong>
                 =>
-                <x-counter data-count="42"></x-counter>
+                <x-counter></x-counter>
+            </li>
+            <li>
+                <strong>Set properties via attributes :</strong>
+
+                <ul>
+                    <li>
+                        <em>No attributes provided</em>
+                        =>
+                        <x-counter></x-counter>
+                    </li>
+                    <li>
+                        <em>data-start="42"</em>
+                        =>
+                        <x-counter data-start="42"></x-counter>
+                    </li>
+                    <li>
+                        <em>data-by="100"</em>
+                        =>
+                        <x-counter data-by="100"></x-counter>
+                    </li>
+                    <li>
+                        <em>data-start="42" data-by="100"</em>
+                        =>
+                        <x-counter data-start="42" data-by="100"></x-counter>
+                    </li>
+                </ul>
             </li>
         </ul>
     </li>
-    <!--<li>-->
-        <!--<strong>Dynamically created : </strong>-->
-        <!--<ul>-->
-            <!--<li id="no-state">-->
-                <!--<strong>no state</strong>-->
-                <!--<small>defaults to 0</small>-->
-                <!--=>-->
-            <!--</li>-->
-            <!--<li id="property">-->
-                <!--<strong>by property</strong>-->
-                <!--<small>counter.count = 1000</small>-->
-                <!--=>-->
-            <!--</li>-->
-            <!--<li id="attribute">-->
-                <!--<strong>by attribute</strong>-->
-                <!--<small>count.setAttribute('count', '1000')</small>-->
-                <!--=>-->
-            <!--</li>-->
-        <!--</ul>-->
-    <!--</li>-->
+
+    <li>
+        <h2>Dynamically attached to the DOM : </h2>
+        <ul>
+            <li id="no-state">
+                <em>No properties & no attributes</em>
+
+                =>
+            </li>
+            <li id="property">
+                <em>counter.start = 1000;</em>
+                
+                =>
+            </li>
+            <li id="attribute">
+                <em>count.setAttribute('start', '1000')</em>
+                 
+                =>
+            </li>
+        </ul>
+    </li>
 </ul>
 </body>
 </html>

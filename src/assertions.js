@@ -1,4 +1,5 @@
 'use strict';
+import LodashIsEqual from 'lodash.isequal';
 
 export const assert = (condition, message) => {
 
@@ -8,6 +9,7 @@ export const assert = (condition, message) => {
   throw new Error(message);
 };
 
+export const isDeeplyEqual = LodashIsEqual;
 export const isEqualTo = (value, input) => input === value;
 export const isTrue = input => isEqualTo(true, input);
 export const isUndefined = input => isEqualTo(void 0, input);
