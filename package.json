@@ -1,6 +1,6 @@
 {
   "name": "pwet",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "Utility for building Webcomponents with factory functions :)",
   "main": "src/component.js",
   "module": "src/component.js",
