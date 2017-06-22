@@ -1,8 +1,8 @@
 import { noop, identity } from './utilities';
 import { ByFilter, EqualFilter } from './filters';
-import { isFunction, isNull, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
+import { isFunction, isNull, isArray, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
 import Property from './property';
-import Attribute from './attribute';
+import StatefulComponent from './decorators/stateful';
 
 
 const internal = {
@@ -29,11 +29,6 @@ internal.parseProperties = input => {
     if (!isObject(property))
       property = { defaultValue: property };
 
-    if (Attribute.isAttribute(property))
-      property = {
-        attribute: property
-      };
-
     property.name = key;
 
     property = Property(property);
@@ -43,6 +38,7 @@ internal.parseProperties = input => {
     return properties;
   }, properties);
 };
+
 internal.isAllowedHook = key => internal.allowedHooks.includes(key);
 
 internal.defaultsHooks = {
@@ -57,9 +53,10 @@ internal.defaultsHooks = {
   }
 };
 
-internal.Component = (factory, element) => {
 
-  assert(internal.Component.get(factory), `'factory' must be a defined component factory`);
+const Component = (factory, element) => {
+
+  assert(Component.get(factory), `'factory' must be a defined component factory`);
   assert(isElement(element), `'element' must be a HTMLElement`);
 
   if (element.pwet !== void 0)
@@ -67,41 +64,8 @@ internal.Component = (factory, element) => {
 
   let _isAttached = false;
   let _isRendered = false;
-  let _isUpdating = false;
   let _isInitializing = false;
-  let _state = factory.initialState();
   let _properties = {};
-  const _callbacks = [];
-
-  const attributeChanged = (name, oldValue, newValue) => {
-
-    const { properties } = component;
-
-    _attributes.forEach(property => {
-
-      if (name === property.name)
-        properties[name] = property.attribute.parse(newValue);
-
-    });
-
-    component.properties = properties
-  };
-
-
-  const editState = (partialState/*, callback*/) => {
-    // console.log('Component.editState()');
-
-    assert(isObject(partialState) && !isNull(partialState), `'partialState' must be an object`);
-
-    // if (!isUndefined(callback))
-    //   _callbacks.push(callback);
-
-    const state = component.state;
-
-    Object.assign(state, partialState);
-
-    update(state);
-  };
 
   const attach = () => {
     // console.log('Component.attach()');
@@ -165,38 +129,6 @@ internal.Component = (factory, element) => {
     });
   };
 
-  const update = newState => {
-    // console.log('Component.update()', newState);
-
-    if (_isUpdating)
-      return;
-
-    assert(isObject(newState) && !isNull(newState), `'newState' must be an object`);
-
-    assert(_state !== newState, `'newState' must not be equal to previous state`);
-
-    if (_isInitializing)
-      return void (_state = newState);
-
-    _isUpdating = true;
-
-    _hooks.update(newState, (shouldRender = false) => {
-
-      _state = newState;
-
-      // const shift = _callbacks.shift.bind(_callbacks);
-      // const stateCopy = Object.assign({}, newState);
-      //
-      // while (_callbacks.length > 0)
-      //   shift()(stateCopy);
-
-      if (shouldRender)
-        component.render();
-
-      _isUpdating = false;
-    });
-  };
-
   const render = () => {
     // console.log('Component.render()', _isAttached);
 
@@ -212,36 +144,33 @@ internal.Component = (factory, element) => {
   const component = element.pwet = {
     isPwetComponent: true,
     element,
-    editState,
     attach,
     detach,
     initialize,
-    update,
     render,
-    attributeChanged,
     get isRendered() {
       return _isRendered
+    },
+    get isInitializing() {
+      return _isInitializing
     }
   };
 
   const _hooks = {
     initialize: factory.initialize.bind(null, component),
-    update: factory.update.bind(null, component),
     render: factory.render.bind(null, component),
     attach: factory.attach.bind(null, component),
     detach: factory.detach.bind(null, component),
   };
 
-  const _attributes = factory.properties.filter(property => property.attribute !== false);
 
   Object.defineProperty(component, 'state', {
+    configurable: true,
     get() {
-      return Object.assign({}, _state);
+      throw new Error('Component is Stateless');
     },
     set(newState) {
-
-      if (!_isUpdating)
-        component.update(newState);
+      throw new Error('Component is Stateless');
     }
   });
 
@@ -252,22 +181,24 @@ internal.Component = (factory, element) => {
     set: initialize
   });
 
-  const overridenHooks = factory(Object.freeze(component));
+  const overridenHooks = factory(Object.freeze(factory.create(component, factory)));
 
   if (!isObject(overridenHooks) || isNull(overridenHooks))
     return component;
 
-  Object.keys(overridenHooks).filter(internal.isAllowedHook).forEach(key => {
+  Object.keys(overridenHooks)
+    .forEach(key => {
 
-    const method = overridenHooks[key];
+      const hook = overridenHooks[key];
 
-    assert(isFunction(method), `'${key}' must be a function`);
+      assert(factory.allowedHooks.includes(key), `'${key}' hook is not allowed`);
 
-    _hooks[key] = method;
-  });
+      assert(isFunction(hook), `'${key}' hook must be a function`);
+
+      _hooks[key] = hook;
+    });
 
   assert(_hooks.render !== noop, `'render' method is required`);
-
 
   // first initialization
   component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {
@@ -300,9 +231,9 @@ internal.Component = (factory, element) => {
   return component;
 };
 
-internal.Component.get = input => internal.factories.find(EqualFilter(input));
+Component.get = input => internal.factories.find(EqualFilter(input));
 
-internal.Component.define = (factory, options) => {
+Component.define = (factory, options) => {
 
   assert(isFunction(factory), `'factory' must be a function`);
 
@@ -310,19 +241,16 @@ internal.Component.define = (factory, options) => {
     assert(isObject(options), `'options' must be an object`);
 
   const { tagName, attributes = {} } = factory;
-  let { initialState = {} } = factory;
 
   assert(isString(tagName) && /[a-z0-9-]+/i, `'tagName' must be a string`);
-  assert(!internal.Component.get(factory), `That component factory is already defined`);
+  assert(!Component.get(factory), `That component factory is already defined`);
   assert(!internal.factories.find(ByFilter('tagName', tagName)), `'${tagName}' component is already defined`);
 
-  if (isObject(initialState) && !isNull(initialState))
-    initialState = identity.bind(null, initialState);
-
-  assert(isFunction(initialState), `'initialState' must be an object or a function`);
-
-  factory.initialState = initialState;
   factory.properties = internal.parseProperties(factory.properties);
+
+  const _attributes = factory.properties.filter(property => property.isAttribute === true);
+
+  const _attributesNames = _attributes.map(property => property.name);
 
   if (!isFunction(factory.attach))
     factory.attach = internal.defaultsHooks.attach;
@@ -330,25 +258,31 @@ internal.Component.define = (factory, options) => {
     factory.initialize = internal.defaultsHooks.initialize;
   if (!isFunction(factory.detach))
     factory.detach = noop;
-  if (!isFunction(factory.update))
-    factory.update = internal.defaultsHooks.update;
   if (!isFunction(factory.render))
     factory.render = noop;
+  if (!isFunction(factory.create))
+    factory.create = identity;
+
+  factory.allowedHooks = internal.allowedHooks; //.concat(allowedHooks);
+
+  if (isFunction(factory.create.define))
+    factory.create.define(factory);
+
+
+
 
   internal.factories.push(factory);
-
-  const attributesNames = factory.properties.filter(property => property.attribute).map(property => property.name);
 
   customElements.define(tagName, class extends HTMLElement {
     constructor() {
 
       super();
 
-      internal.Component(factory, this);
+      Component(factory, this);
     }
     static get observedAttributes() {
 
-      return attributesNames;
+      return _attributesNames;
     }
     connectedCallback() {
 
@@ -360,10 +294,22 @@ internal.Component.define = (factory, options) => {
     }
     attributeChangedCallback(name, oldValue, newValue) {
 
-      this.pwet.attributeChanged(name, oldValue, newValue);
+      const { properties } = this.pwet;
+
+      _attributes.forEach(property => {
+
+        if (name === property.name)
+          properties[name] = property.parse(newValue);
+
+      });
+
+      this.pwet.properties = properties;
     }
   });
 
 };
 
-export default internal.Component
+export {
+  StatefulComponent,
+  Component as default
+}

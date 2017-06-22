@@ -1,4 +1,5 @@
 import Attribute from '../../src/attribute';
+import { StatefulComponent } from '../../src/component';
 
 
 const Counter = component => {
@@ -56,6 +57,8 @@ const Counter = component => {
   };
 };
 
+Counter.create = StatefulComponent;
+
 Counter.render = (component) => {
   console.log('Counter.render()', component.state);
 
@@ -63,13 +66,10 @@ Counter.render = (component) => {
 };
 
 Counter.properties = {
-  start: {
-    attribute: Attribute.number
-  },
-  by: {
-    attribute: Attribute.number,
+  start: Attribute.number(),
+  by: Attribute.integer({
     defaultValue: 1
-  }
+  })
 };
 
 Counter.initialState = {

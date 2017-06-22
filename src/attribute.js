@@ -4,10 +4,8 @@ import { assert, isUndefined, isObject, isFunction } from './assertions';
 const internal = {};
 
 internal.empty = val => val == null;
-internal.nullOrType = type => val => internal.empty(val) ? null : type(val);
-internal.zeroOrNumber = val => internal.empty(val) ? 0 : Number(val);
-internal.attribute = Object.freeze({ source: true });
-
+internal.nullOrType = type => val => !val ? null : type(val);
+internal.zeroOrNumber = val => !val ? 0 : Number(val);
 
 
 internal.Attribute = module.exports = (attribute) => {
@@ -15,18 +13,17 @@ internal.Attribute = module.exports = (attribute) => {
   assert(isObject(attribute), `'attribute' must be an object`);
 
   let {
-    stringify = identity,
-    parse = identity,
+    stringify = JSON.stringify,
+    parse = JSON.parse,
     coerce = identity,
     defaultValue,
   } = attribute;
 
   assert(isFunction(stringify), `'stringify' must be a function`);
   assert(isFunction(parse), `'parse' must be a function`);
-  assert(isFunction(coerce), `'coerce' must be a function`);
 
-  return Object.freeze({
-    isPwetAttribute: true,
+  return Object.assign(attribute, {
+    isAttribute: true,
     stringify,
     parse,
     coerce,
@@ -34,37 +31,49 @@ internal.Attribute = module.exports = (attribute) => {
   });
 };
 
-internal.Attribute.isAttribute = input => isObject(input) && input.isPwetAttribute === true;
+internal.Attribute.array = options => internal.Attribute(
+  Object.assign({
+    coerce: val => Array.isArray(val) ? val : (!val ? null : [val]),
+    defaultValue: [],
+  }, options)
+);
 
-internal.Attribute.array = internal.Attribute({
-  coerce: val => Array.isArray(val) ? val : internal.empty(val) ? null : [val],
-  defaultValue: Object.freeze([]),
-  parse: JSON.parse,
-  stringify: JSON.stringify
-});
+internal.Attribute.boolean = options => internal.Attribute(
+  Object.assign({
+    coerce: Boolean,
+    defaultValue: false,
+    parse: val => !!val,
+    stringify: val => val ? '' : null
+  }, options)
+);
 
-internal.Attribute.boolean = internal.Attribute({
-  coerce: Boolean,
-  defaultValue: false,
-  parse: val => !internal.empty(val),
-  stringify: val => val ? '' : null
-});
+internal.Attribute.number = options => internal.Attribute(
+  Object.assign({
+    defaultValue: 0,
+    coerce: internal.zeroOrNumber,
+    parse: internal.zeroOrNumber,
+    stringify: internal.nullOrType(Number)
+  }, options)
+);
 
-internal.Attribute.number = internal.Attribute({
-  defaultValue: 0,
-  coerce: internal.zeroOrNumber,
-  parse: internal.zeroOrNumber,
-  stringify: internal.nullOrType(Number)
-});
+internal.Attribute.integer = options => internal.Attribute.number(
+  Object.assign(options, { coerce: parseInt })
+);
 
-internal.Attribute.object = internal.Attribute({
-  defaultValue: Object.freeze({}),
-  parse: JSON.parse,
-  stringify: JSON.stringify
-});
+internal.Attribute.float = options => internal.Attribute.number(
+  Object.assign(options, { coerce: parseFloat })
+);
 
-internal.Attribute.string = internal.Attribute({
-  defaultValue: '',
-  coerce: String,
-  stringify: internal.nullOrType(String)
-});
+internal.Attribute.object = options => internal.Attribute(
+  Object.assign({
+    defaultValue: {}
+  }, options)
+);
+
+internal.Attribute.string = options => internal.Attribute(
+  Object.assign({
+    defaultValue: '',
+    coerce: String,
+    stringify: internal.nullOrType(String)
+  }, options)
+);
