@@ -59,7 +59,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "81d3375557e23835b7b0"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "55ed04d3e9dee329d0be"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
@@ -7778,7 +7778,8 @@ internal.Attribute = module.exports = function (attribute) {
   });
 };
 
-internal.Attribute.array = function (options) {
+internal.Attribute.array = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return internal.Attribute(Object.assign({
     coerce: function coerce(val) {
       return Array.isArray(val) ? val : !val ? null : [val];
@@ -7787,7 +7788,8 @@ internal.Attribute.array = function (options) {
   }, options));
 };
 
-internal.Attribute.boolean = function (options) {
+internal.Attribute.boolean = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return internal.Attribute(Object.assign({
     coerce: Boolean,
     defaultValue: false,
@@ -7800,7 +7802,8 @@ internal.Attribute.boolean = function (options) {
   }, options));
 };
 
-internal.Attribute.number = function (options) {
+internal.Attribute.number = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return internal.Attribute(Object.assign({
     defaultValue: 0,
     coerce: internal.zeroOrNumber,
@@ -7809,21 +7812,31 @@ internal.Attribute.number = function (options) {
   }, options));
 };
 
-internal.Attribute.integer = function (options) {
-  return internal.Attribute.number(Object.assign(options, { coerce: parseInt }));
+internal.Attribute.integer = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return internal.Attribute.number(Object.assign(options, {
+    coerce: parseInt,
+    parse: parseInt
+  }));
 };
 
-internal.Attribute.float = function (options) {
-  return internal.Attribute.number(Object.assign(options, { coerce: parseFloat }));
+internal.Attribute.float = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return internal.Attribute.number(Object.assign(options, {
+    coerce: parseFloat,
+    parse: parseFloat
+  }));
 };
 
-internal.Attribute.object = function (options) {
+internal.Attribute.object = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return internal.Attribute(Object.assign({
     defaultValue: {}
   }, options));
 };
 
-internal.Attribute.string = function (options) {
+internal.Attribute.string = function () {
+  var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return internal.Attribute(Object.assign({
     defaultValue: '',
     coerce: String,
@@ -8037,6 +8050,7 @@ var Component = function Component(factory, element) {
     get: function get() {
       return Object.assign({}, _properties);
     },
+
     set: initialize
   });
 

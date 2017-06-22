@@ -180,7 +180,9 @@ const Component = (factory, element) => {
   });
 
   Object.defineProperty(component, 'properties', {
-    get: () => Object.assign({}, _properties),
+    get() {
+      return Object.assign({}, _properties)
+    },
     set: initialize
   });
 

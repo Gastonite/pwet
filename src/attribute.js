@@ -31,14 +31,14 @@ internal.Attribute = module.exports = (attribute) => {
   });
 };
 
-internal.Attribute.array = options => internal.Attribute(
+internal.Attribute.array = (options = {}) => internal.Attribute(
   Object.assign({
     coerce: val => Array.isArray(val) ? val : (!val ? null : [val]),
     defaultValue: [],
   }, options)
 );
 
-internal.Attribute.boolean = options => internal.Attribute(
+internal.Attribute.boolean = (options = {}) => internal.Attribute(
   Object.assign({
     coerce: Boolean,
     defaultValue: false,
@@ -47,7 +47,7 @@ internal.Attribute.boolean = options => internal.Attribute(
   }, options)
 );
 
-internal.Attribute.number = options => internal.Attribute(
+internal.Attribute.number = (options = {}) => internal.Attribute(
   Object.assign({
     defaultValue: 0,
     coerce: internal.zeroOrNumber,
@@ -56,21 +56,27 @@ internal.Attribute.number = options => internal.Attribute(
   }, options)
 );
 
-internal.Attribute.integer = options => internal.Attribute.number(
-  Object.assign(options, { coerce: parseInt })
+internal.Attribute.integer = (options = {}) => internal.Attribute.number(
+  Object.assign(options, {
+    coerce: parseInt,
+    parse: parseInt
+  })
 );
 
-internal.Attribute.float = options => internal.Attribute.number(
-  Object.assign(options, { coerce: parseFloat })
+internal.Attribute.float = (options = {}) => internal.Attribute.number(
+  Object.assign(options, {
+    coerce: parseFloat,
+    parse: parseFloat
+  })
 );
 
-internal.Attribute.object = options => internal.Attribute(
+internal.Attribute.object = (options = {}) => internal.Attribute(
   Object.assign({
     defaultValue: {}
   }, options)
 );
 
-internal.Attribute.string = options => internal.Attribute(
+internal.Attribute.string = (options = {}) => internal.Attribute(
   Object.assign({
     defaultValue: '',
     coerce: String,
