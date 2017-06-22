@@ -60,7 +60,8 @@ const Counter = component => {
 Counter.create = StatefulComponent;
 
 Counter.render = (component) => {
-  console.log('Counter.render()', component.state);
+
+  console.log('Counter.render()', component);
 
   component.element.innerHTML = JSON.stringify(component.state, null, 2)
 };

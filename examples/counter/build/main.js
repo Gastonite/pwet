@@ -59,7 +59,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "02c80e8306ec02851461"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "81d3375557e23835b7b0"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
@@ -7901,8 +7901,12 @@ internal.parseProperties = function (input) {
   }, properties);
 };
 
-internal.isAllowedHook = function (key) {
-  return internal.allowedHooks.includes(key);
+internal.StatelessError = function () {
+  throw new Error('Component is Stateless');
+};
+
+internal.isAllowedHook = function (factory, key) {
+  return factory.allowedHooks.includes(key);
 };
 
 internal.defaultsHooks = {
@@ -7933,7 +7937,7 @@ var Component = function Component(factory, element) {
 
     if (factory.shadowRoot) element.shadowRoot = element.attachShadow(factory.shadowRoot);
 
-    _hooks.attach(function () {
+    component.hooks.attach(function () {
       var shouldRender = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
 
 
@@ -7950,7 +7954,7 @@ var Component = function Component(factory, element) {
 
     _isAttached = false;
 
-    _hooks.detach();
+    component.hooks.detach();
   };
 
   var initialize = function initialize(newProperties) {
@@ -7971,7 +7975,7 @@ var Component = function Component(factory, element) {
       return Object.assign(properties, _defineProperty({}, name, !(0, _assertions.isUndefined)(newProperties[name]) ? coerce(newProperties[name]) : !(0, _assertions.isUndefined)(_properties[name]) ? _properties[name] : defaultValue));
     }, {});
 
-    _hooks.initialize(newProperties, function () {
+    component.hooks.initialize(newProperties, function () {
       var shouldRender = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
 
 
@@ -7988,7 +7992,7 @@ var Component = function Component(factory, element) {
 
     if (!_isAttached) return;
 
-    _hooks.render();
+    component.hooks.render();
 
     _isRendered = true;
   };
@@ -8005,33 +8009,38 @@ var Component = function Component(factory, element) {
     },
     get isInitializing() {
       return _isInitializing;
+    },
+    get hooks() {
+      return _hooks;
+    },
+    get state() {
+      return _hooks;
+    },
+    set properties(newValue) {
+      return _hooks;
     }
   };
 
-  var _hooks = {
-    initialize: factory.initialize.bind(null, component),
-    render: factory.render.bind(null, component),
-    attach: factory.attach.bind(null, component),
-    detach: factory.detach.bind(null, component)
-  };
+  var _hooks = factory.allowedHooks.reduce(function (hooks, key) {
+    return Object.assign(hooks, _defineProperty({}, key, factory[key].bind(null, component)));
+  }, {});
+
+  (0, _assertions.assert)(_hooks.render !== _utilities.noop, '\'render\' method is required');
 
   Object.defineProperty(component, 'state', {
     configurable: true,
-    get: function get() {
-      throw new Error('Component is Stateless');
-    },
-    set: function set(newState) {
-      throw new Error('Component is Stateless');
-    }
+    get: internal.StatelessError,
+    set: internal.StatelessError
   });
 
   Object.defineProperty(component, 'properties', {
     get: function get() {
       return Object.assign({}, _properties);
     },
-
     set: initialize
   });
+
+  factory.create(component, factory);
 
   var hooks = factory(component);
 
@@ -8039,22 +8048,14 @@ var Component = function Component(factory, element) {
 
   if (!(0, _assertions.isObject)(hooks) || (0, _assertions.isNull)(hooks)) return component;
 
-  Object.keys(hooks).forEach(function (key) {
+  Object.keys(hooks).filter(internal.isAllowedHook.bind(null, factory)).forEach(function (key) {
 
     var hook = hooks[key];
-
-    (0, _assertions.assert)(factory.allowedHooks.includes(key), '\'' + key + '\' hook is not allowed');
 
     (0, _assertions.assert)((0, _assertions.isFunction)(hook), '\'' + key + '\' hook must be a function');
 
     _hooks[key] = hook;
   });
-
-  (0, _assertions.assert)(_hooks.render !== _utilities.noop, '\'render\' method is required');
-
-  factory.create(component, factory, _hooks);
-
-  console.log('overridenHooks:', hooks);
 
   // first initialization
   component.properties = factory.properties.reduce(function (properties, _ref2) {
@@ -8207,14 +8208,10 @@ internal.defaultsHooks = {
   }
 };
 
-var StatefulComponent = function StatefulComponent(component, factory, hooks) {
+var StatefulComponent = function StatefulComponent(component, factory) {
 
   var _state = factory.initialState();
   var _isUpdating = false;
-
-  var _hooks = {
-    update: (0, _assertions.isFunction)(hooks.update) || factory.update.bind(null, component)
-  };
 
   var editState = function editState(partialState) {
 
@@ -8239,7 +8236,7 @@ var StatefulComponent = function StatefulComponent(component, factory, hooks) {
 
     _isUpdating = true;
 
-    _hooks.update(newState, function () {
+    component.hooks.update(newState, function () {
       var shouldRender = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
 
 
@@ -8253,6 +8250,7 @@ var StatefulComponent = function StatefulComponent(component, factory, hooks) {
 
   Object.assign(component, {
     editState: editState,
+    update: update,
     get isUpdating() {
       return _isUpdating;
     }
@@ -8269,9 +8267,7 @@ var StatefulComponent = function StatefulComponent(component, factory, hooks) {
     }
   });
 
-  return {
-    update: update
-  };
+  return component;
 };
 
 StatefulComponent.define = function (factory) {
@@ -8533,7 +8529,8 @@ var Counter = function Counter(component) {
 Counter.create = _component.StatefulComponent;
 
 Counter.render = function (component) {
-  console.log('Counter.render()', component.state);
+
+  console.log('Counter.render()', component);
 
   component.element.innerHTML = JSON.stringify(component.state, null, 2);
 };

@@ -39,7 +39,11 @@ internal.parseProperties = input => {
   }, properties);
 };
 
-internal.isAllowedHook = key => internal.allowedHooks.includes(key);
+internal.StatelessError = () => {
+  throw new Error('Component is Stateless');
+};
+
+internal.isAllowedHook = (factory, key) => factory.allowedHooks.includes(key);
 
 internal.defaultsHooks = {
   attach(component, attach) {
@@ -73,7 +77,7 @@ const Component = (factory, element) => {
     if (factory.shadowRoot)
       element.shadowRoot = element.attachShadow(factory.shadowRoot);
 
-    _hooks.attach((shouldRender = false) => {
+    component.hooks.attach((shouldRender = false) => {
 
       _isAttached = true;
 
@@ -90,7 +94,7 @@ const Component = (factory, element) => {
 
     _isAttached = false;
 
-    _hooks.detach();
+    component.hooks.detach();
   };
 
   const initialize = newProperties => {
@@ -115,7 +119,7 @@ const Component = (factory, element) => {
       });
     }, {});
 
-    _hooks.initialize(newProperties, (shouldRender = false) => {
+    component.hooks.initialize(newProperties, (shouldRender = false) => {
 
       _properties = newProperties;
 
@@ -132,7 +136,7 @@ const Component = (factory, element) => {
     if (!_isAttached)
       return;
 
-    _hooks.render();
+    component.hooks.render();
 
     _isRendered = true;
   };
@@ -150,34 +154,37 @@ const Component = (factory, element) => {
     },
     get isInitializing() {
       return _isInitializing
+    },
+    get hooks() {
+      return _hooks
+    },
+    get state() {
+      return _hooks
+    },
+    set properties(newValue) {
+      return _hooks
     }
   };
 
-  const _hooks = {
-    initialize: factory.initialize.bind(null, component),
-    render: factory.render.bind(null, component),
-    attach: factory.attach.bind(null, component),
-    detach: factory.detach.bind(null, component),
-  };
+  const _hooks = factory.allowedHooks.reduce((hooks, key) => {
+    return Object.assign(hooks, { [key]: factory[key].bind(null, component) });
+  }, {});
+
+  assert(_hooks.render !== noop, `'render' method is required`);
 
 
   Object.defineProperty(component, 'state', {
     configurable: true,
-    get() {
-      throw new Error('Component is Stateless');
-    },
-    set(newState) {
-      throw new Error('Component is Stateless');
-    }
+    get: internal.StatelessError,
+    set: internal.StatelessError
   });
 
   Object.defineProperty(component, 'properties', {
-    get() {
-      return Object.assign({}, _properties);
-    },
+    get: () => Object.assign({}, _properties),
     set: initialize
   });
 
+  factory.create(component, factory);
 
   const hooks = factory(component);
 
@@ -187,25 +194,15 @@ const Component = (factory, element) => {
     return component;
 
   Object.keys(hooks)
+    .filter(internal.isAllowedHook.bind(null, factory))
     .forEach(key => {
 
       const hook = hooks[key];
-
-      assert(factory.allowedHooks.includes(key), `'${key}' hook is not allowed`);
 
       assert(isFunction(hook), `'${key}' hook must be a function`);
 
       _hooks[key] = hook;
     });
-
-
-  assert(_hooks.render !== noop, `'render' method is required`);
-
-  factory.create(component, factory, _hooks);
-
-
-  console.log('overridenHooks:', hooks);
-
 
   // first initialization
   component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {

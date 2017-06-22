@@ -12,14 +12,10 @@ internal.defaultsHooks = {
   }
 };
 
-const StatefulComponent = (component, factory, hooks) => {
+const StatefulComponent = (component, factory) => {
 
   let _state = factory.initialState();
   let _isUpdating = false;
-
-  const _hooks = {
-    update: isFunction(hooks.update) || factory.update.bind(null, component)
-  };
 
   const editState = (partialState) => {
 
@@ -46,7 +42,7 @@ const StatefulComponent = (component, factory, hooks) => {
 
     _isUpdating = true;
 
-    _hooks.update(newState, (shouldRender = false) => {
+    component.hooks.update(newState, (shouldRender = false) => {
 
       _state = newState;
 
@@ -59,6 +55,7 @@ const StatefulComponent = (component, factory, hooks) => {
 
   Object.assign(component, {
     editState,
+    update,
     get isUpdating() {
       return _isUpdating
     }
@@ -78,9 +75,7 @@ const StatefulComponent = (component, factory, hooks) => {
     }
   });
 
-  return {
-    update
-  };
+  return component;
 };
 
 StatefulComponent.define = factory => {
