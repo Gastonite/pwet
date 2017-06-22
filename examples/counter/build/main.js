@@ -59,7 +59,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "93f4ada1e0bc4cc3f6bf"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "02c80e8306ec02851461"; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
 /******/ 	var hotCurrentParents = []; // eslint-disable-line no-unused-vars
@@ -7709,7 +7709,7 @@ var isString = exports.isString = function isString(input) {
   return ofType('string', input);
 };
 var isFunction = exports.isFunction = function isFunction(input) {
-  return ofType('function', input);
+  return ofType('function', input) && input;
 };
 var isNumber = exports.isNumber = function isNumber(input) {
   return ofType('number', input);
@@ -7872,7 +7872,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
 var internal = {
   factories: [],
-  allowedHooks: ['attach', 'detach', 'initialize', 'update', 'render']
+  allowedHooks: ['attach', 'detach', 'initialize', 'render']
 };
 
 internal.parseProperties = function (input) {
@@ -7908,9 +7908,6 @@ internal.isAllowedHook = function (key) {
 internal.defaultsHooks = {
   attach: function attach(component, _attach) {
     _attach(!component.isRendered);
-  },
-  update: function update(component, newState, _update) {
-    _update(true);
   },
   initialize: function initialize(component, newProperties, _initialize) {
     _initialize(true);
@@ -8036,13 +8033,15 @@ var Component = function Component(factory, element) {
     set: initialize
   });
 
-  var overridenHooks = factory(Object.freeze(factory.create(component, factory)));
+  var hooks = factory(component);
 
-  if (!(0, _assertions.isObject)(overridenHooks) || (0, _assertions.isNull)(overridenHooks)) return component;
+  // factory.create(factory(component), factory);
 
-  Object.keys(overridenHooks).forEach(function (key) {
+  if (!(0, _assertions.isObject)(hooks) || (0, _assertions.isNull)(hooks)) return component;
 
-    var hook = overridenHooks[key];
+  Object.keys(hooks).forEach(function (key) {
+
+    var hook = hooks[key];
 
     (0, _assertions.assert)(factory.allowedHooks.includes(key), '\'' + key + '\' hook is not allowed');
 
@@ -8052,6 +8051,10 @@ var Component = function Component(factory, element) {
   });
 
   (0, _assertions.assert)(_hooks.render !== _utilities.noop, '\'render\' method is required');
+
+  factory.create(component, factory, _hooks);
+
+  console.log('overridenHooks:', hooks);
 
   // first initialization
   component.properties = factory.properties.reduce(function (properties, _ref2) {
@@ -8204,10 +8207,14 @@ internal.defaultsHooks = {
   }
 };
 
-var StatefulComponent = function StatefulComponent(component, factory) {
+var StatefulComponent = function StatefulComponent(component, factory, hooks) {
 
   var _state = factory.initialState();
   var _isUpdating = false;
+
+  var _hooks = {
+    update: (0, _assertions.isFunction)(hooks.update) || factory.update.bind(null, component)
+  };
 
   var editState = function editState(partialState) {
 
@@ -8246,15 +8253,10 @@ var StatefulComponent = function StatefulComponent(component, factory) {
 
   Object.assign(component, {
     editState: editState,
-    update: update,
     get isUpdating() {
       return _isUpdating;
     }
   });
-
-  var _hooks = {
-    update: factory.update.bind(null, component)
-  };
 
   Object.defineProperty(component, 'state', {
     configurable: true,
@@ -8267,7 +8269,9 @@ var StatefulComponent = function StatefulComponent(component, factory) {
     }
   });
 
-  return component;
+  return {
+    update: update
+  };
 };
 
 StatefulComponent.define = function (factory) {

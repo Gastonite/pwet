@@ -24,7 +24,7 @@ export const isString = input => {
 
   return ofType('string', input);
 };
-export const isFunction = input => ofType('function', input);
+export const isFunction = input => ofType('function', input) && input;
 export const isNumber = input => ofType('number', input);
 export const isInteger = input => Number.isInteger(input);
 export const isComponent = input => isObject(input) && input.isPwetComponent === true;

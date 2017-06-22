@@ -7,7 +7,7 @@ import StatefulComponent from './decorators/stateful';
 
 const internal = {
   factories: [],
-  allowedHooks: ['attach', 'detach', 'initialize', 'update', 'render']
+  allowedHooks: ['attach', 'detach', 'initialize', 'render']
 };
 
 internal.parseProperties = input => {
@@ -44,9 +44,6 @@ internal.isAllowedHook = key => internal.allowedHooks.includes(key);
 internal.defaultsHooks = {
   attach(component, attach) {
     attach(!component.isRendered);
-  },
-  update(component, newState, update) {
-    update(true);
   },
   initialize(component, newProperties, initialize) {
     initialize(true);
@@ -181,15 +178,18 @@ const Component = (factory, element) => {
     set: initialize
   });
 
-  const overridenHooks = factory(Object.freeze(factory.create(component, factory)));
 
-  if (!isObject(overridenHooks) || isNull(overridenHooks))
+  const hooks = factory(component);
+
+  // factory.create(factory(component), factory);
+
+  if (!isObject(hooks) || isNull(hooks))
     return component;
 
-  Object.keys(overridenHooks)
+  Object.keys(hooks)
     .forEach(key => {
 
-      const hook = overridenHooks[key];
+      const hook = hooks[key];
 
       assert(factory.allowedHooks.includes(key), `'${key}' hook is not allowed`);
 
@@ -198,7 +198,14 @@ const Component = (factory, element) => {
       _hooks[key] = hook;
     });
 
+
   assert(_hooks.render !== noop, `'render' method is required`);
+
+  factory.create(component, factory, _hooks);
+
+
+  console.log('overridenHooks:', hooks);
+
 
   // first initialization
   component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {
