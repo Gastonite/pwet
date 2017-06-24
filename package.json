@@ -1,7 +1,7 @@
 {
   "name": "pwet",
   "version": "1.3.7",
-  "description": "Utility for building Webcomponents with factory functions :)",
+  "description": "Utility for building HTML custom elements",
   "main": "src/component.js",
   "module": "src/component.js",
   "scripts": {

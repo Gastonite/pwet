@@ -1,6 +1,6 @@
 # Pwet
 
-Utility for building Webcomponents with factory functions :)
+Utility for building HTML [custom elements](https://www.w3.org/TR/custom-elements).
 
 ### Show example
 

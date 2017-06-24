@@ -43,8 +43,6 @@ internal.StatelessError = () => {
   throw new Error('Component is Stateless');
 };
 
-internal.isAllowedHook = (factory, key) => factory.allowedHooks.includes(key);
-
 internal.defaultsHooks = {
   attach(component, attach) {
     attach(!component.isRendered);
@@ -79,6 +77,7 @@ const Component = (factory, element) => {
 
     component.hooks.attach((shouldRender = false) => {
 
+      console.log('shouldRender', shouldRender)
       _isAttached = true;
 
       if (shouldRender)
@@ -97,7 +96,7 @@ const Component = (factory, element) => {
     component.hooks.detach();
   };
 
-  const initialize = newProperties => {
+  const initialize = (newProperties = {}) => {
     // console.log('Component.initialize()', 'before', _isInitializing);
 
     if (_isInitializing)
@@ -152,6 +151,9 @@ const Component = (factory, element) => {
     get isRendered() {
       return _isRendered
     },
+    get isAttached() {
+      return _isAttached
+    },
     get isInitializing() {
       return _isInitializing
     },
@@ -188,25 +190,33 @@ const Component = (factory, element) => {
 
   factory.create(component, factory);
 
-  const hooks = factory(component);
+  const returned = factory(component);
 
-  // factory.create(factory(component), factory);
-
-  if (!isObject(hooks) || isNull(hooks))
+  if (!isObject(returned) || isNull(returned))
     return component;
 
-  Object.keys(hooks)
-    .filter(internal.isAllowedHook.bind(null, factory))
+  // let _initialProperties = {};
+
+  Object.keys(returned)
     .forEach(key => {
 
-      const hook = hooks[key];
+      // if (key === 'properties') {
+      //
+      //   _initialProperties = returned.properties;
+      //   return;
+      // }
+
+      if (!factory.allowedHooks.includes(key))
+        return;
+
+      const hook = returned[key];
 
       assert(isFunction(hook), `'${key}' hook must be a function`);
 
       _hooks[key] = hook;
     });
 
-  // first initialization
+  // First initialization
   component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {
 
     Object.defineProperty(element, name, {
@@ -274,9 +284,6 @@ Component.define = (factory, options) => {
   if (isFunction(factory.create.define))
     factory.create.define(factory);
 
-
-
-
   internal.factories.push(factory);
 
   customElements.define(tagName, class extends HTMLElement {
@@ -302,17 +309,13 @@ Component.define = (factory, options) => {
 
       const { properties } = this.pwet;
 
-      _attributes.forEach(property => {
+      const attribute = _attributes.find(attribute => attribute.name === name);
 
-        if (name === property.name)
-          properties[name] = property.parse(newValue);
-
-      });
+      properties[name] = attribute.parse(newValue);
 
       this.pwet.properties = properties;
     }
   });
-
 };
 
 export {
