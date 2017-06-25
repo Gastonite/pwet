@@ -313,7 +313,7 @@ Component.define = (factory, options) => {
 
       properties[name] = attribute.parse(newValue);
 
-      this.pwet.properties = properties;
+      this.pwet.initialize(properties);
     }
   });
 };
