@@ -1,9 +1,8 @@
-
-import { isObject, isArray } from './assertions';
+import { isObject, isArray, isNull } from './assertions';
 
 export const clone = input =>
   !isArray(input)
-    ? (isObject(input)
+    ? (isObject(input) && !isNull(input)
       ? Object.assign({}, input)
       : input)
     : input.map(clone);
@@ -23,3 +22,4 @@ export const isAttached = element => {
 
   return false;
 };
+export const decorate = (func, decorator, ...args) => decorator.bind(null, func, ...args);

@@ -1,3 +1,4 @@
+import Property from './property';
 import { identity } from './utilities';
 import { assert, isUndefined, isObject, isFunction } from './assertions';
 
@@ -15,7 +16,8 @@ internal.Attribute = module.exports = (attribute) => {
   let {
     stringify = JSON.stringify,
     parse = JSON.parse,
-    coerce = identity,
+    coerce,
+    isDataAttribute = true,
     defaultValue,
   } = attribute;
 
@@ -24,6 +26,7 @@ internal.Attribute = module.exports = (attribute) => {
 
   return Object.assign(attribute, {
     isAttribute: true,
+    isDataAttribute,
     stringify,
     parse,
     coerce,
@@ -31,20 +34,16 @@ internal.Attribute = module.exports = (attribute) => {
   });
 };
 
-internal.Attribute.array = (options = {}) => internal.Attribute(
-  Object.assign({
-    coerce: val => Array.isArray(val) ? val : (!val ? null : [val]),
-    defaultValue: [],
-  }, options)
-);
-
+internal.Attribute.array = (options = {}) => internal.Attribute(Property.array(options));
+internal.Attribute.plain = (options = {}) => internal.Attribute(Property.plain(options));
 internal.Attribute.boolean = (options = {}) => internal.Attribute(
-  Object.assign({
-    coerce: Boolean,
-    defaultValue: false,
-    parse: val => !!val,
+  Object.assign(Property.boolean(options), {
+    parse: val => {
+      console.log('parse', val)
+      return val === '';
+    },
     stringify: val => val ? '' : null
-  }, options)
+  })
 );
 
 internal.Attribute.number = (options = {}) => internal.Attribute(
@@ -70,11 +69,7 @@ internal.Attribute.float = (options = {}) => internal.Attribute.number(
   })
 );
 
-internal.Attribute.object = (options = {}) => internal.Attribute(
-  Object.assign({
-    defaultValue: {}
-  }, options)
-);
+internal.Attribute.object = (options = {}) => internal.Attribute(Property.object(options));
 
 internal.Attribute.string = (options = {}) => internal.Attribute(
   Object.assign({

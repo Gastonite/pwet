@@ -1,5 +1,6 @@
 'use strict';
 import LodashIsEqual from 'lodash.isequal';
+import LodashIsPlainObject from 'lodash.isplainobject';
 
 export const assert = (condition, message) => {
 
@@ -18,7 +19,8 @@ export const isInstanceOf = (type, input) => input instanceof type;
 export const isArray =  input => isInstanceOf(Array, input);
 export const ofType =  (type, input) => isEqualTo(type, typeof input);
 export const isObject = input => ofType('object', input);
-export const isEmpty = input => !input || input.length < 1;
+export const isPlainObject = LodashIsPlainObject;
+export const isEmpty = input => input.length < 1;
 export const isBoolean = input => ofType('boolean', input);
 export const isString = input => {
 

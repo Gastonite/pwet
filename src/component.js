@@ -1,14 +1,32 @@
-import { noop, identity } from './utilities';
-import { ByFilter, EqualFilter } from './filters';
-import { isFunction, isNull, isArray, isUndefined, isElement, isString, isEmpty, isObject, assert } from './assertions';
+import kebabCase from 'lodash.kebabcase';
+import camelCase from 'lodash.camelcase';
+import cloneDeep from 'lodash.clonedeep';
 import Property from './property';
-import StatefulComponent from './decorators/stateful';
+import { noop, decorate, clone, identity } from './utilities';
+import { ByFilter, EqualFilter } from './filters';
+import {
+  isFunction,
+  isNull,
+  isEqualTo,
+  isDeeplyEqual,
+  isArray,
+  isUndefined,
+  isElement,
+  isString,
+  isEmpty,
+  isObject,
+  isPlainObject,
+  assert
+} from './assertions';
+// import StatefulComponent from './decorators/stateful';
 
 
 const internal = {
   factories: [],
   allowedHooks: ['attach', 'detach', 'initialize', 'render']
 };
+
+const $pwet = Symbol('pwet');
 
 internal.parseProperties = input => {
 
@@ -45,48 +63,61 @@ internal.StatelessError = () => {
 
 internal.defaultsHooks = {
   attach(component, attach) {
-    attach(!component.isRendered);
+
+    attach(true);
   },
-  initialize(component, newProperties, initialize) {
-    initialize(true);
-  }
+  initialize: (component, newProperties, initialize) => initialize(true)
 };
 
 
-const Component = (factory, element) => {
+const Component = (factory, element, dependencies) => {
 
   assert(Component.get(factory), `'factory' must be a defined component factory`);
   assert(isElement(element), `'element' must be a HTMLElement`);
 
-  if (element.pwet !== void 0)
+  if (element[$pwet] !== void 0)
     return;
 
+  let _isCreated = false;
   let _isAttached = false;
   let _isRendered = false;
   let _isInitializing = false;
+  let _isInitialized = false;
   let _properties = {};
 
+  if (factory.shadow)
+    element.attachShadow(factory.shadow);
+
   const attach = () => {
-    // console.log('Component.attach()');
+
+    if (factory.logLevel > 0)
+      console.log(`[${factory.tagName}]`, 'attach()');
 
     if (_isAttached)
       return;
 
-    if (factory.shadowRoot)
-      element.shadowRoot = element.attachShadow(factory.shadowRoot);
-
-    component.hooks.attach((shouldRender = false) => {
-
-      console.log('shouldRender', shouldRender)
+    component.hooks.attach((shouldRender) => {
       _isAttached = true;
 
-      if (shouldRender)
+      if (!_isRendered && shouldRender)
         component.render();
     });
+
+  };
+
+  attach.after = (shouldUpdate = true) => {
+
+    // console.log('Component.attach.after()', { shouldUpdate, _isAttached });
+
+    if (shouldUpdate)
+      component.render();
+
   };
 
   const detach = () => {
-    // console.log('Component.detach()');
+
+    if (factory.logLevel > 0)
+      console.log(`[${factory.tagName}]`, 'detach()');
 
     if (!_isAttached)
       return;
@@ -96,41 +127,70 @@ const Component = (factory, element) => {
     component.hooks.detach();
   };
 
-  const initialize = (newProperties = {}) => {
-    // console.log('Component.initialize()', 'before', _isInitializing);
+  const initialize = (properties = {}) => {
 
     if (_isInitializing)
       return;
 
-    assert(isObject(newProperties) && !isNull(newProperties), `'newProperties' must be an object`);
+    if (factory.logLevel > 0)
+      console.log(`[${factory.tagName}]`, 'initialize()', properties, _properties);
 
-    _isInitializing = true;
+    assert(isObject(properties) && !isNull(properties), `'properties' must be an object`);
 
-    newProperties = factory.properties.reduce((properties, { name, coerce, defaultValue }) => {
+    properties = factory.properties.reduce((newProperties, { name, coerce, defaultValue, isDataAttribute }) => {
 
-      return Object.assign(properties, {
-        [name]:
-          !isUndefined(newProperties[name])
-            ? coerce(newProperties[name])
-            : (!isUndefined(_properties[name])
-              ?_properties[name]
-              : defaultValue)
-      });
+      let oldValue = _properties[name];
+      let newValue = properties[name];
+
+      if (isUndefined(newValue) && isDataAttribute)
+        newValue = properties[`data-${name}`];
+
+      // console.log('HEY', name, oldValue, newValue);
+
+      // newValue = isUndefined(newValue)
+      //   ? (_properties.hasOwnProperty(name) ? oldValue : defaultValue)
+      //   : newValue;
+
+      // if (isUndefined(newValue) && _properties.hasOwnProperty(name))
+      //   newValue = _properties[name];
+
+
+        newValue = !isUndefined(newValue)
+          ? coerce(newValue)
+          : defaultValue;
+
+      return Object.assign(newProperties, { [name]: newValue })
     }, {});
 
-    component.hooks.initialize(newProperties, (shouldRender = false) => {
+    if (isDeeplyEqual(properties, _properties)) {
+      if (factory.logLevel > 0)
+        console.warn(`[${factory.tagName}]`, 'aborted initialization (properties are unchanged)', properties, _properties);
+      return;
+    }
+    // console.log(`[${factory.tagName}]`, 'initializing...', newProperties);
 
-      _properties = newProperties;
+    _isInitializing = true;
+    // console.log(`[${factory.tagName}]`, 'aaaaa', component.hooks.initialize);
+
+    component.hooks.initialize(properties, (shouldRender) => {
+      _properties = properties;
+      // Object.assign(_properties, properties);
+
+      _isInitializing = false;
+      _isInitialized = true;
 
       if (shouldRender)
         component.render();
 
-      _isInitializing = false;
+      // console.log(`[${factory.tagName}]`, 'initialized', properties);
+
     });
   };
 
   const render = () => {
-    // console.log('Component.render()', _isAttached);
+
+    if (factory.logLevel > 0)
+      console.log(`[${factory.tagName}]`, 'render()', { _isAttached, ..._properties });
 
     if (!_isAttached)
       return;
@@ -140,14 +200,13 @@ const Component = (factory, element) => {
     _isRendered = true;
   };
 
-
-  const component = element.pwet = {
+  const component = element[$pwet] = {
     isPwetComponent: true,
     element,
+    factory,
     attach,
-    detach,
-    initialize,
     render,
+    detach,
     get isRendered() {
       return _isRendered
     },
@@ -157,45 +216,68 @@ const Component = (factory, element) => {
     get isInitializing() {
       return _isInitializing
     },
+    get isInitialized() {
+      return _isInitialized
+    },
     get hooks() {
       return _hooks
     },
-    get state() {
-      return _hooks
-    },
-    set properties(newValue) {
-      return _hooks
-    }
+    // get state() {
+    //   return _hooks
+    // },
+    // set properties(newValue) {
+    //   return _hooks
+    // }
   };
+
+  Object.assign(element, {
+    initialize
+  });
 
   const _hooks = factory.allowedHooks.reduce((hooks, key) => {
     return Object.assign(hooks, { [key]: factory[key].bind(null, component) });
   }, {});
 
-  assert(_hooks.render !== noop, `'render' method is required`);
-
-
-  Object.defineProperty(component, 'state', {
-    configurable: true,
-    get: internal.StatelessError,
-    set: internal.StatelessError
-  });
-
-  Object.defineProperty(component, 'properties', {
+  Object.defineProperty(element, 'properties', {
     get() {
-      return Object.assign({}, _properties)
+      return cloneDeep(_properties);
     },
     set: initialize
   });
 
-  factory.create(component, factory);
+  initialize(factory.properties.reduce((properties, { name, isDataAttribute, parse, defaultValue }) => {
 
-  const returned = factory(component);
+    Object.defineProperty(element, name, {
+      get() {
+        return _properties[name];
+      },
+      set(newValue) {
+
+        initialize(Object.assign(element.properties, {
+          [name]: newValue
+        }));
+      }
+    });
+
+    let value = defaultValue;
+
+    if (isDataAttribute) {
+
+      const attributeValue = element.dataset[name];
+
+
+      if (!isUndefined(attributeValue))
+        value = parse(attributeValue);
+    }
+
+    return Object.assign(properties, { [name]: value });
+  }, {}));
+
+
+  const returned = factory.create(component, factory.dependencies);
 
   if (!isObject(returned) || isNull(returned))
     return component;
-
-  // let _initialProperties = {};
 
   Object.keys(returned)
     .forEach(key => {
@@ -216,58 +298,123 @@ const Component = (factory, element) => {
       _hooks[key] = hook;
     });
 
-  // First initialization
-  component.properties = factory.properties.reduce((properties, { name, attribute, defaultValue }) => {
 
-    Object.defineProperty(element, name, {
-      get() {
-        return component.properties[name];
-      },
-      set(newValue) {
+  assert(_hooks.render !== noop, `'render' method is required`);
 
-        component.properties = Object.assign(component.properties, {
-          [name]: newValue
-        });
-      }
-    });
+  const _attributes = factory.properties
+    .filter(property => property.isAttribute === true)
+    .reduce((attributes, attribute) => {
 
-    let value = defaultValue;
+      let name = kebabCase(attribute.name);
 
-    if (attribute !== false) {
+      if (attribute.isDataAttribute)
+        name = `data-${name}`;
 
-      const attributeValue = element.dataset[name];
+      return Object.assign(attributes, { [name]: attribute });
+    }, {});
 
-      if (!isUndefined(attributeValue))
-        value = attributeValue;
-    }
+  const _attributesName = Object.keys(_attributes);
 
-    return Object.assign(properties, { [name]: value });
-  }, {});
+  const _observer = new MutationObserver(mutations => {
+    // mutations.forEach(function(mutation) {
+    // console.error(mutations);
+    // });
+
+    mutations = mutations
+      .filter(({ attributeName }) => _attributesName.includes(attributeName))
+      .map(({ attributeName:name, oldValue }) => ({
+        name,
+        oldValue,
+        value: element.getAttribute(name)
+      }))
+      .filter(({ value, oldValue }) => !isEqualTo(value, oldValue));
+
+    if (isEmpty(mutations))
+      return;
+
+    console.error(`[${factory.tagName}]`, 'ATTRIBUTES MUTATIONS', mutations.map(({ name, value }) => `${name}=${value}`));
+    const { properties } = element;
+
+    initialize(Object.assign(properties, mutations.reduce((attributes, { name, value }) => {
+
+      const { parse, isDataAttribute } = _attributes[name];
+
+      name = camelCase(isDataAttribute ? name.slice(5) : name);
+
+      return Object.assign(attributes, { [name]: parse(value) });
+    }, {})));
+
+    // const { name, parse, isDataAttribute } = _attributes[attributeName];
+    //
+    // // console.error(`[${factory.tagName}]`, 'attributeChangedCallback', name, typeof newValue, this.pages);
+    //
+    // properties[name] = parse(newValue);
+    //
+    // this.initialize(properties);
+
+  });
+
+  _observer.observe(element, { attributes: true, attributeOldValue: true });
 
   return component;
 };
 
 Component.get = input => internal.factories.find(EqualFilter(input));
 
-Component.define = (factory, options) => {
+const ThinComponent = (factory) => {
+  // console.log(`ThinComponent(${factory.tagName})`);
+
+  // const factory = (component, factory, dependencies) => {
+  //
+  //   console.log('ThinComponent()', component);
+  //
+  //   return {
+  //     render: render.bind(null, component, dependencies)
+  //   }
+  // };
+
+  factory.create = decorate(factory.create, (next, component, ...args) => {
+    // let hooks = next(component, ...args);
+
+
+    // if (!isObject(hooks))
+    //   hooks = {};
+
+    return {
+      // ...hooks,
+      render: () => next(component, ...args)
+    }
+  });
+
+  return factory;
+};
+
+Component.define = (tagName, factory) => {
+
+  if (isFunction(tagName)) {
+    factory = tagName;
+    tagName = factory.tagName || factory.name;
+  }
 
   assert(isFunction(factory), `'factory' must be a function`);
 
-  if (!isUndefined(options))
-    assert(isObject(options), `'options' must be an object`);
+  const { dependencies = {} } = factory;
 
-  const { tagName, attributes = {} } = factory;
+  assert(isString(tagName) && tagName.length > 0, `'tagName' must be a string`);
 
-  assert(isString(tagName) && /[a-z0-9-]+/i, `'tagName' must be a string`);
+  tagName = kebabCase(tagName);
+
+  if (!tagName.includes('-'))
+    tagName = `x-${tagName}`;
+
   assert(!Component.get(factory), `That component factory is already defined`);
   assert(!internal.factories.find(ByFilter('tagName', tagName)), `'${tagName}' component is already defined`);
+  assert(isObject(dependencies) && !isNull(dependencies), `'dependencies' must be an object`);
 
-  factory.properties = internal.parseProperties(factory.properties);
-
-  const _attributes = factory.properties.filter(property => property.isAttribute === true);
-
-  const _attributesNames = _attributes.map(property => property.name);
-
+  factory.tagName = tagName;
+  factory.allowedHooks = [];
+  if (!isFunction(factory.create))
+    factory.create = factory;
   if (!isFunction(factory.attach))
     factory.attach = internal.defaultsHooks.attach;
   if (!isFunction(factory.initialize))
@@ -276,49 +423,97 @@ Component.define = (factory, options) => {
     factory.detach = noop;
   if (!isFunction(factory.render))
     factory.render = noop;
-  if (!isFunction(factory.create))
-    factory.create = identity;
 
-  factory.allowedHooks = internal.allowedHooks; //.concat(allowedHooks);
 
-  if (isFunction(factory.create.define))
-    factory.create.define(factory);
+  if (!isUndefined(factory.decorators)) {
+
+    if (!isArray(factory.decorators))
+      factory.decorators = [factory.decorators];
+
+    factory.decorators.forEach(decorator => {
+      assert((isFunction(decorator)), `'decorator' must be a function`);
+      decorator(factory, dependencies);
+    });
+
+    // if (isFunction(factory.define)) {
+    //   // factory.define = ThinComponent;
+    //   factory = factory.define(factory);
+    //
+    //   // if (isObject(factory.properties) && !isNull(factory.properties)) {
+    //   //   factory.define = ThickComponent;
+    //   // }
+    // }
+  }
+  if (!isUndefined(factory.shadow))
+    assert((isPlainObject(factory.shadow)), `'shadow' must be a plain object`);
+
+  assert(isFunction(factory.create), `'create' must be a function`);
+  assert(isFunction(factory.attach), `'attach' must be a function`);
+  assert(isFunction(factory.initialize), `'initialize' must be a function`);
+  assert(isFunction(factory.detach), `'detach' must be a function`);
+  assert(isFunction(factory.render), `'render' must be a function`);
+
+  factory.tagName = tagName;
+  factory.dependencies = dependencies;
+
+  factory.properties = internal.parseProperties(factory.properties);
+
+  factory.allowedHooks = factory.allowedHooks.reduce((hooks, hook) => {
+
+    assert(isString(hook), `'hook' must be a string`);
+
+    if (isString(hook) && !internal.allowedHooks.includes(hook))
+      hooks.push(hook);
+
+    return hooks;
+  }, []).concat(internal.allowedHooks);
+
+  // [
+  //   ...factory.allowedHooks,
+  //   ...internal.allowedHooks
+  // ]; //.concat(allowedHooks);
 
   internal.factories.push(factory);
+
+  // console.log(`Component.define(${factory.tagName})`);
 
   customElements.define(tagName, class extends HTMLElement {
     constructor() {
 
       super();
 
-      Component(factory, this);
+      Component(factory, this, dependencies);
     }
-    static get observedAttributes() {
-
-      return _attributesNames;
-    }
+    // static get observedAttributes() {
+    //
+    //   return _attributesNames;
+    // }
     connectedCallback() {
 
-      this.pwet.attach();
+      this[$pwet].attach();
     }
     disconnectedCallback() {
 
-      this.pwet.detach();
+      this[$pwet].detach();
     }
-    attributeChangedCallback(name, oldValue, newValue) {
-
-      const { properties } = this.pwet;
-
-      const attribute = _attributes.find(attribute => attribute.name === name);
-
-      properties[name] = attribute.parse(newValue);
-
-      this.pwet.initialize(properties);
-    }
+    // attributeChangedCallback(attributeName, oldValue, newValue) {
+    //
+    //   const { properties } = this.pwet;
+    //
+    //   const { name, parse, isDataAttribute } = _attributes[attributeName];
+    //
+    //   console.error(`[${factory.tagName}]`, 'attributeChangedCallback', name, typeof newValue, this.pages);
+    //
+    //   properties[name] = parse(newValue);
+    //
+    //   this.initialize(properties);
+    //
+    // }
   });
 };
 
 export {
-  StatefulComponent,
+  $pwet,
+  ThinComponent,
   Component as default
 }
