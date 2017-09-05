@@ -1,5 +1,5 @@
 import Attribute from '../../src/attribute';
-import { StatefulComponent } from '../../src/component';
+import StatefulComponent from '../../src/decorators/stateful';
 
 
 const Counter = component => {
@@ -10,6 +10,11 @@ const Counter = component => {
 
   let _interval;
 
+  const _editState = (partialState) => {
+
+    component.state = Object.assign(component.state, partialState);
+  };
+
   const initialize = (newProperties, initialize) => {
 
 
@@ -18,7 +23,7 @@ const Counter = component => {
     const { state } = component;
 
     if (newProperties.start !== state.count)
-      component.editState({ count: newProperties.start });
+      _editState({ count: newProperties.start });
 
     initialize(!component.isRendered);
 
@@ -29,7 +34,7 @@ const Counter = component => {
   const _incrementBy = value => () => {
     const { state } = component;
 
-    component.editState({
+    _editState({
       count: state.count + element.by
     });
   };
@@ -57,7 +62,7 @@ const Counter = component => {
   };
 };
 
-Counter.create = StatefulComponent;
+Counter.decorators = [StatefulComponent];
 
 Counter.render = (component) => {
 

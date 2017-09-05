@@ -66,7 +66,9 @@ internal.defaultsHooks = {
 
     attach(true);
   },
-  initialize: (component, newProperties, initialize) => initialize(true)
+  initialize: (component, newProperties, initialize) => {
+    initialize(true)
+  }
 };
 
 
@@ -200,6 +202,7 @@ const Component = (factory, element, dependencies) => {
     _isRendered = true;
   };
 
+
   const component = element[$pwet] = {
     isPwetComponent: true,
     element,
@@ -221,22 +224,22 @@ const Component = (factory, element, dependencies) => {
     },
     get hooks() {
       return _hooks
-    },
-    // get state() {
-    //   return _hooks
-    // },
-    // set properties(newValue) {
-    //   return _hooks
-    // }
+    }
   };
+
+  const _hooks = factory.allowedHooks.reduce((hooks, key) => {
+
+    const hook = factory[key];
+
+    assert(isFunction(hook), `'${key}' must be a function`);
+
+    return Object.assign(hooks, { [key]: hook.bind(null, component) });
+  }, {});
+
 
   Object.assign(element, {
     initialize
   });
-
-  const _hooks = factory.allowedHooks.reduce((hooks, key) => {
-    return Object.assign(hooks, { [key]: factory[key].bind(null, component) });
-  }, {});
 
   Object.defineProperty(element, 'properties', {
     get() {
@@ -273,7 +276,6 @@ const Component = (factory, element, dependencies) => {
     return Object.assign(properties, { [name]: value });
   }, {}));
 
-
   const returned = factory.create(component, factory.dependencies);
 
   if (!isObject(returned) || isNull(returned))
@@ -281,12 +283,6 @@ const Component = (factory, element, dependencies) => {
 
   Object.keys(returned)
     .forEach(key => {
-
-      // if (key === 'properties') {
-      //
-      //   _initialProperties = returned.properties;
-      //   return;
-      // }
 
       if (!factory.allowedHooks.includes(key))
         return;
@@ -297,7 +293,6 @@ const Component = (factory, element, dependencies) => {
 
       _hooks[key] = hook;
     });
-
 
   assert(_hooks.render !== noop, `'render' method is required`);
 

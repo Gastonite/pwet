@@ -1,7 +1,10 @@
 'use strict';
 
 const Path = require('path');
+const Webpack = require('webpack');
 const WebpackConfig = require('../webpack-config');
+const HTMLWebpackPlugin = require('html-webpack-plugin');
+
 
 module.exports = (env) => {
 
@@ -17,10 +20,16 @@ module.exports = (env) => {
   const template = Path.resolve(__dirname, 'index.html');
 
   return WebpackConfig({
-    isBuild,
-    entry,
-    output,
-    template
+    dependencies: {
+      Webpack,
+      HTMLWebpackPlugin
+    },
+    options: {
+      isBuild,
+      entry,
+      output,
+      template
+    }
   });
 
 };

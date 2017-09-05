@@ -1,9 +1,6 @@
 'use strict';
 
-const HTMLWebpackPlugin = require('html-webpack-plugin');
-const Webpack = require('webpack');
-
-module.exports = (options) => {
+module.exports = ({ options, dependencies: { Webpack, HTMLWebpackPlugin }}) => {
 
   const { isBuild, entry, output, template = false, port = 3000 } = options;
 
