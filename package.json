@@ -1,6 +1,6 @@
 {
   "name": "pwet",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Utility for building HTML custom elements",
   "main": "src/component.js",
   "module": "src/component.js",
