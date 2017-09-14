@@ -1,4 +1,4 @@
-import { isObject, isArray, isNull } from './assertions';
+import { isObject, isArray, isNull } from 'kwak';
 
 export const clone = input =>
   !isArray(input)

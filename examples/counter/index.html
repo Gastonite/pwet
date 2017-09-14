@@ -27,58 +27,53 @@
 <h1>Simple counter component example</h1>
 <ul>
     <li>
-        <h2>Already in the DOM :</h2>
+        <h2>Set properties via html data-attributes :</h2>
+
         <ul>
             <li>
-                <strong>No attribute provided</strong>
+                <em>No attributes provided</em>
                 =>
                 <x-counter></x-counter>
             </li>
             <li>
-                <strong>Set properties via attributes :</strong>
-
-                <ul>
-                    <li>
-                        <em>No attributes provided</em>
-                        =>
-                        <x-counter></x-counter>
-                    </li>
-                    <li>
-                        <em>data-start="42"</em>
-                        =>
-                        <x-counter data-start="42"></x-counter>
-                    </li>
-                    <li>
-                        <em>data-by="100"</em>
-                        =>
-                        <x-counter data-by="100"></x-counter>
-                    </li>
-                    <li>
-                        <em>data-start="42" data-by="100"</em>
-                        =>
-                        <x-counter data-start="42" data-by="100"></x-counter>
-                    </li>
-                </ul>
+                <em>data-start="42"</em>
+                =>
+                <x-counter data-start="42"></x-counter>
+            </li>
+            <li>
+                <em>data-by="100"</em>
+                =>
+                <x-counter data-by="100"></x-counter>
+            </li>
+            <li>
+                <em>data-start="42" data-by="100"</em>
+                =>
+                <x-counter data-start="42" data-by="100"></x-counter>
             </li>
         </ul>
     </li>
 
     <li>
-        <h2>Dynamically attached to the DOM : </h2>
+        <h2>Set properties via javascript : </h2>
         <ul>
             <li id="no-state">
-                <em>No properties & no attributes</em>
+                <em>No properties & no attributes  </em>
 
                 =>
             </li>
             <li id="property">
-                <em>counter.start = 1000;</em>
-                
+                <em>counter.start = 1000  </em>
+
                 =>
             </li>
             <li id="attribute">
-                <em>count.setAttribute('start', '1000')</em>
-                 
+                <em>counter.setAttribute('data-start', '1000')  </em>
+
+                =>
+            </li>
+            <li id="dataset">
+                <em>counter.dataset.start = 1000  </em>
+
                 =>
             </li>
         </ul>

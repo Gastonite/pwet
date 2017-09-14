@@ -10,20 +10,14 @@ const Counter = component => {
 
   let _interval;
 
-  const _editState = (partialState) => {
-
-    component.state = Object.assign(component.state, partialState);
-  };
-
   const initialize = (newProperties, initialize) => {
-
 
     console.log('Counter.initialize() before', newProperties);
 
     const { state } = component;
 
     if (newProperties.start !== state.count)
-      _editState({ count: newProperties.start });
+      component.editState({ count: newProperties.start });
 
     initialize(!component.isRendered);
 
@@ -34,7 +28,7 @@ const Counter = component => {
   const _incrementBy = value => () => {
     const { state } = component;
 
-    _editState({
+    component.editState({
       count: state.count + element.by
     });
   };
@@ -72,7 +66,9 @@ Counter.render = (component) => {
 };
 
 Counter.properties = {
-  start: Attribute.number(),
+  start: Attribute.integer({
+    defaultValue: 0
+  }),
   by: Attribute.integer({
     defaultValue: 1
   })

@@ -1,4 +1,4 @@
-import { assert } from '../assertions';
+import { assert } from 'kwak';
 import { decorate } from '../utilities';
 import Throttle from 'lodash.throttle';
 

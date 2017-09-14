@@ -1,9 +1,7 @@
 import { identity } from './utilities';
-import { assert, isBoolean, isString, isObject, isFunction, isUndefined } from './assertions';
-import isPlainObject from 'lodash.isplainobject';
-const internal = {};
+import { assert, isBoolean, isString, isObject, isFunction, isUndefined, isPlainObject } from 'kwak';
 
-internal.Property = module.exports = (property) => {
+const Property = (property) => {
 
   assert(isObject(property), `'property' must be an object`);
 
@@ -13,7 +11,6 @@ internal.Property = module.exports = (property) => {
     defaultValue
   } = property;
 
-  // console.log(property)
   assert(isString(name), `Invalid property: 'name' must be a string`);
   assert(isFunction(coerce), `Invalid '${name}' property: 'coerce' must be a function`);
 
@@ -43,25 +40,26 @@ internal.Property = module.exports = (property) => {
   }));
 };
 
-internal.Property.array = (options = {}) => Object.assign({
+Property.array = (options = {}) => Object.assign({
   coerce: value => Array.isArray(value) ? value : (!value ? null : [value]),
-  defaultValue: [],
+  defaultValue: []
 }, options);
 
-internal.Property.object = (options = {}) => Object.assign({
+Property.object = (options = {}) => Object.assign({
   defaultValue: {},
   coerce: value => isUndefined(value) || !isObject(value) ? void 0 : value
 }, options);
 
 
-internal.Property.plain = (options = {}) => internal.Property.object(
+Property.plain = (options = {}) => Property.object(
   Object.assign({
     coerce: value => isUndefined(value) || !isPlainObject(value) ? void 0 : value
   }, options)
 );
 
-internal.Property.boolean = (options = {}) => Object.assign({
+Property.boolean = (options = {}) => Object.assign({
   coerce: Boolean,
   defaultValue: false
 }, options);
 
+export default Property;

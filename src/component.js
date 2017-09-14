@@ -17,9 +17,7 @@ import {
   isObject,
   isPlainObject,
   assert
-} from './assertions';
-// import StatefulComponent from './decorators/stateful';
-
+} from 'kwak';
 
 const internal = {
   factories: [],
@@ -66,9 +64,7 @@ internal.defaultsHooks = {
 
     attach(true);
   },
-  initialize: (component, newProperties, initialize) => {
-    initialize(true)
-  }
+  initialize: (component, newProperties, initialize) => initialize(true)
 };
 
 
@@ -130,6 +126,7 @@ const Component = (factory, element, dependencies) => {
   };
 
   const initialize = (properties = {}) => {
+    console.log('Component.initialize()', { properties, _isInitializing });
 
     if (_isInitializing)
       return;
@@ -169,10 +166,12 @@ const Component = (factory, element, dependencies) => {
         console.warn(`[${factory.tagName}]`, 'aborted initialization (properties are unchanged)', properties, _properties);
       return;
     }
+
     // console.log(`[${factory.tagName}]`, 'initializing...', newProperties);
 
     _isInitializing = true;
-    // console.log(`[${factory.tagName}]`, 'aaaaa', component.hooks.initialize);
+
+     console.log(`[${factory.tagName}]`, 'aaaaa', component.hooks.initialize);
 
     component.hooks.initialize(properties, (shouldRender) => {
       _properties = properties;
@@ -202,7 +201,6 @@ const Component = (factory, element, dependencies) => {
     _isRendered = true;
   };
 
-
   const component = element[$pwet] = {
     isPwetComponent: true,
     element,
@@ -225,21 +223,21 @@ const Component = (factory, element, dependencies) => {
     get hooks() {
       return _hooks
     }
+    // get state() {
+    //   return _hooks
+    // },
+    // set properties(newValue) {
+    //   return _hooks
+    // }
   };
-
-  const _hooks = factory.allowedHooks.reduce((hooks, key) => {
-
-    const hook = factory[key];
-
-    assert(isFunction(hook), `'${key}' must be a function`);
-
-    return Object.assign(hooks, { [key]: hook.bind(null, component) });
-  }, {});
-
 
   Object.assign(element, {
     initialize
   });
+
+  const _hooks = factory.allowedHooks.reduce((hooks, key) => {
+    return Object.assign(hooks, { [key]: factory[key].bind(null, component) });
+  }, {});
 
   Object.defineProperty(element, 'properties', {
     get() {
@@ -247,6 +245,27 @@ const Component = (factory, element, dependencies) => {
     },
     set: initialize
   });
+
+
+  const returned = factory.create(component, factory.dependencies);
+
+  if (!isObject(returned) || isNull(returned))
+    return component;
+
+  Object.keys(returned)
+    .forEach(key => {
+
+      if (!factory.allowedHooks.includes(key))
+        return;
+
+      const hook = returned[key];
+
+      assert(isFunction(hook), `'${key}' hook must be a function`);
+
+      _hooks[key] = hook;
+    });
+
+  assert(_hooks.render !== noop, `'render' method is required`);
 
   initialize(factory.properties.reduce((properties, { name, isDataAttribute, parse, defaultValue }) => {
 
@@ -276,26 +295,6 @@ const Component = (factory, element, dependencies) => {
     return Object.assign(properties, { [name]: value });
   }, {}));
 
-  const returned = factory.create(component, factory.dependencies);
-
-  if (!isObject(returned) || isNull(returned))
-    return component;
-
-  Object.keys(returned)
-    .forEach(key => {
-
-      if (!factory.allowedHooks.includes(key))
-        return;
-
-      const hook = returned[key];
-
-      assert(isFunction(hook), `'${key}' hook must be a function`);
-
-      _hooks[key] = hook;
-    });
-
-  assert(_hooks.render !== noop, `'render' method is required`);
-
   const _attributes = factory.properties
     .filter(property => property.isAttribute === true)
     .reduce((attributes, attribute) => {
@@ -311,9 +310,6 @@ const Component = (factory, element, dependencies) => {
   const _attributesName = Object.keys(_attributes);
 
   const _observer = new MutationObserver(mutations => {
-    // mutations.forEach(function(mutation) {
-    // console.error(mutations);
-    // });
 
     mutations = mutations
       .filter(({ attributeName }) => _attributesName.includes(attributeName))
@@ -408,6 +404,7 @@ Component.define = (tagName, factory) => {
 
   factory.tagName = tagName;
   factory.allowedHooks = [];
+
   if (!isFunction(factory.create))
     factory.create = factory;
   if (!isFunction(factory.attach))
@@ -463,14 +460,9 @@ Component.define = (tagName, factory) => {
     return hooks;
   }, []).concat(internal.allowedHooks);
 
-  // [
-  //   ...factory.allowedHooks,
-  //   ...internal.allowedHooks
-  // ]; //.concat(allowedHooks);
-
   internal.factories.push(factory);
 
-  // console.log(`Component.define(${factory.tagName})`);
+   console.log(`Component.define(${factory.tagName})`, factory.allowedHooks);
 
   customElements.define(tagName, class extends HTMLElement {
     constructor() {

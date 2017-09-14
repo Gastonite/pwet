@@ -1,15 +1,11 @@
 import Property from './property';
 import { identity } from './utilities';
-import { assert, isUndefined, isObject, isFunction } from './assertions';
+import { assert, isUndefined, isObject, isFunction } from 'kwak';
 
-const internal = {};
+const _nullOrType = type => val => !val ? null : type(val);
+const _zeroOrNumber = val => !val ? 0 : Number(val);
 
-internal.empty = val => val == null;
-internal.nullOrType = type => val => !val ? null : type(val);
-internal.zeroOrNumber = val => !val ? 0 : Number(val);
-
-
-internal.Attribute = module.exports = (attribute) => {
+const Attribute = module.exports = (attribute) => {
 
   assert(isObject(attribute), `'attribute' must be an object`);
 
@@ -19,7 +15,7 @@ internal.Attribute = module.exports = (attribute) => {
     coerce,
     isDataAttribute = true,
     defaultValue,
-  } = attribute;
+    } = attribute;
 
   assert(isFunction(stringify), `'stringify' must be a function`);
   assert(isFunction(parse), `'parse' must be a function`);
@@ -34,9 +30,9 @@ internal.Attribute = module.exports = (attribute) => {
   });
 };
 
-internal.Attribute.array = (options = {}) => internal.Attribute(Property.array(options));
-internal.Attribute.plain = (options = {}) => internal.Attribute(Property.plain(options));
-internal.Attribute.boolean = (options = {}) => internal.Attribute(
+Attribute.array = (options = {}) => Attribute(Property.array(options));
+Attribute.plain = (options = {}) => Attribute(Property.plain(options));
+Attribute.boolean = (options = {}) => Attribute(
   Object.assign(Property.boolean(options), {
     parse: val => {
       console.log('parse', val)
@@ -46,35 +42,37 @@ internal.Attribute.boolean = (options = {}) => internal.Attribute(
   })
 );
 
-internal.Attribute.number = (options = {}) => internal.Attribute(
+Attribute.number = (options = {}) => Attribute(
   Object.assign({
     defaultValue: 0,
-    coerce: internal.zeroOrNumber,
-    parse: internal.zeroOrNumber,
-    stringify: internal.nullOrType(Number)
+    coerce: _zeroOrNumber,
+    parse: _zeroOrNumber,
+    stringify: _nullOrType(Number)
   }, options)
 );
 
-internal.Attribute.integer = (options = {}) => internal.Attribute.number(
+Attribute.integer = (options = {}) => Attribute.number(
   Object.assign(options, {
     coerce: parseInt,
     parse: parseInt
   })
 );
 
-internal.Attribute.float = (options = {}) => internal.Attribute.number(
+Attribute.float = (options = {}) => Attribute.number(
   Object.assign(options, {
     coerce: parseFloat,
     parse: parseFloat
   })
 );
 
-internal.Attribute.object = (options = {}) => internal.Attribute(Property.object(options));
+Attribute.object = (options = {}) => Attribute(Property.object(options));
 
-internal.Attribute.string = (options = {}) => internal.Attribute(
+Attribute.string = (options = {}) => Attribute(
   Object.assign({
     defaultValue: '',
     coerce: String,
-    stringify: internal.nullOrType(String)
+    stringify: _nullOrType(String)
   }, options)
 );
+
+export default Attribute;
