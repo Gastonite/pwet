@@ -9,31 +9,18 @@ To show it in action:
 ```
 git clone https://github.com/Gastonite/pwet
 ```
-2. Install **pwet** dependencies:
+2. Install **pwet** dependencies and example dependencies:
 
 - if you are using yarn :
   ```
-  yarn
+  yarn && cd examples/counter && yarn && yarn dev
   ```
 - if you are using npm :
   ```
-  npm i
-  ```
-3. After dependences are installed, go to one example directory :
-```
-cd examples/<example-name>
-```
-4. install example dependencies and run **dev** npm script:
-- if you are using yarn :
-  ```
-  yarn && yarn dev
-  ```
-- if you are using npm :
-  ```
-  npm i && npm run dev
+  npm i && cd examples/counter && npm i && yarn run dev
   ```
 
-Now the demo is visible at [http://localhost:3000](http://localhost:3000)
+3. Now the demo is visible at [http://localhost:3000](http://localhost:3000)
 
 
 ## Installation

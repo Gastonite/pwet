@@ -71,6 +71,7 @@ Attribute.string = (options = {}) => Attribute(
   Object.assign({
     defaultValue: '',
     coerce: String,
+    parse: _nullOrType(String),
     stringify: _nullOrType(String)
   }, options)
 );

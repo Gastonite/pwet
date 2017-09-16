@@ -54,16 +54,13 @@ internal.StatefulComponent =  (factory, { actions = {} }) => {
       actions[key] = action.bind(null, component);
     });
 
+    let hooks = next(component, dependencies);
 
-    let returned = next(component, dependencies);
+    if (!isObject(hooks) || isNull(hooks))
+      hooks = {};
 
-    console.log('returned1', returned);
-
-    if (!isObject(returned) || isNull(returned))
-      returned = {};
-
-    if (!isFunction(returned.update))
-      returned.update = identity;
+    if (!isFunction(hooks.update))
+      hooks.update = identity;
 
     let _state = factory.initialState();
     let _isUpdating = false;
@@ -100,7 +97,7 @@ internal.StatefulComponent =  (factory, { actions = {} }) => {
 
       // console.log('BEFORE hook.update');
 
-      newState = returned.update(newState);
+      newState = hooks.update(newState);
 
 
       if (newState) {
@@ -167,9 +164,7 @@ internal.StatefulComponent =  (factory, { actions = {} }) => {
     });
 
 
-    console.log('returned2', returned);
-
-    return returned;
+    return hooks;
   });
 
   Object.defineProperty(factory, 'isStateful', {

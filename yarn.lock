@@ -3,8 +3,8 @@
 
 
 "@webcomponents/custom-elements@^1.0.0":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@webcomponents/custom-elements/-/custom-elements-1.0.2.tgz#4747102701d2d7eb2458af2a36b5015d7e06d9c7"
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/@webcomponents/custom-elements/-/custom-elements-1.0.4.tgz#f7de0103026f27863ecfabaf1d450b9c21714910"
 
 "@webcomponents/shadycss@^1.0.1":
   version "1.0.5"

@@ -76,6 +76,9 @@ const Component = (factory, element, dependencies) => {
   if (element[$pwet] !== void 0)
     return;
 
+  if (factory.logLevel > 0)
+    console.log(`[${factory.tagName}]`, 'create()');
+
   let _isCreated = false;
   let _isAttached = false;
   let _isRendered = false;
@@ -126,13 +129,12 @@ const Component = (factory, element, dependencies) => {
   };
 
   const initialize = (properties = {}) => {
-    console.log('Component.initialize()', { properties, _isInitializing });
 
     if (_isInitializing)
       return;
 
     if (factory.logLevel > 0)
-      console.log(`[${factory.tagName}]`, 'initialize()', properties, _properties);
+      console.log(`[${factory.tagName}]`, 'initialize()', { new: properties, old: _properties });
 
     assert(isObject(properties) && !isNull(properties), `'properties' must be an object`);
 
@@ -154,9 +156,9 @@ const Component = (factory, element, dependencies) => {
       //   newValue = _properties[name];
 
 
-        newValue = !isUndefined(newValue)
-          ? coerce(newValue)
-          : defaultValue;
+      newValue = !isUndefined(newValue)
+        ? coerce(newValue)
+        : defaultValue;
 
       return Object.assign(newProperties, { [name]: newValue })
     }, {});
@@ -171,7 +173,7 @@ const Component = (factory, element, dependencies) => {
 
     _isInitializing = true;
 
-     console.log(`[${factory.tagName}]`, 'aaaaa', component.hooks.initialize);
+    //console.log(`[${factory.tagName}]`, 'aaaaa', component.hooks.initialize);
 
     component.hooks.initialize(properties, (shouldRender) => {
       _properties = properties;
@@ -306,6 +308,7 @@ const Component = (factory, element, dependencies) => {
 
       return Object.assign(attributes, { [name]: attribute });
     }, {});
+
 
   const _attributesName = Object.keys(_attributes);
 
@@ -462,7 +465,7 @@ Component.define = (tagName, factory) => {
 
   internal.factories.push(factory);
 
-   console.log(`Component.define(${factory.tagName})`, factory.allowedHooks);
+  console.log(`Component.define(${factory.tagName})`, factory.allowedHooks);
 
   customElements.define(tagName, class extends HTMLElement {
     constructor() {
