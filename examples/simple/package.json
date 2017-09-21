@@ -1,0 +1,26 @@
+{
+  "name": "example",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Clément Pasquier <clement@n00sphere.net>",
+  "license": "GPL-3.0",
+  "scripts": {
+    "dev": "webpack-dev-server",
+    "build": "webpack"
+  },
+  "dependencies": {
+    "babel-core": "^6.25.0",
+    "babel-loader": "^7.0.0",
+    "css-loader": "^0.28.7",
+    "extract-text-webpack-plugin": "^3.0.0",
+    "file-loader": "^0.11.2",
+    "html-webpack-plugin": "^2.28.0",
+    "raw-loader": "^0.5.1",
+    "style-loader": "^0.18.2",
+    "stylus": "^0.54.5",
+    "stylus-relative-loader": "^3.4.0",
+    "url-loader": "^0.5.9",
+    "webpack": "^3.5.6",
+    "webpack-dev-server": "^2.8.1"
+  }
+}
