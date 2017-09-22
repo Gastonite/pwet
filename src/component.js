@@ -1,88 +1,186 @@
 'use strict';
 
 import LodashCloneDeep from 'lodash.clonedeep';
-import { isFunction } from 'kwak';
-import { decorate } from './utilities';
+import { assert, isFunction, isUndefined, isObject, isNull, isEmpty, isEqualTo, isPlainObject } from 'kwak';
+import { decorate, clone } from './utilities';
 
 const Component = (component = {}) => {
 
-  let { element, hooks, log, properties = {} } = component;
-
-
+  const { element, hooks, attributes = {} } = component;
+  let { properties = {} } = component;
   let _isAttached = false;
   let _isRendered = false;
-  console.log('Component()', JSON.stringify(properties, null, 2));
+  let _isInitializing = false;
 
-  let _properties = Object.keys(properties).reduce((before, key) => {
+  const _attributesNames = Object.freeze(Object.keys(attributes));
 
-    const description = properties[key];
 
-    if (isFunction(description.get))
-      description.get = description.get.bind(null, component);
-    if (isFunction(description.set))
-      description.set = description.set.bind(null, component);
+  Object.defineProperties(component, {
+    properties: { get: () => {
 
-    before[key] = description.value;
+      assert(!_isInitializing, `Cannot get properties during initialization`);
 
-    return before;
-  }, {});
-
-  Object.defineProperties(element, properties);
-
-  console.log('Component()', _properties);
-
-  hooks.attach = decorate(hooks.attach, (next, component) => {
-
-    _isAttached = true;
-
-    if (!_isRendered)
-      component.hooks.render(component);
-
-    component.log('attach', { _isAttached, _isRendered }, _properties);
-
-    next(component);
-
-    _isRendered = true;
+      return clone(_properties)
+    } },
+    isRendered: { get: () => _isRendered  },
+    isInitializing: { get: () => _isInitializing  },
+    isAttached: { get: () => _isAttached  }
   });
 
-  hooks.detach = decorate(hooks.detach, (next, component) => {
+  component.detach = () => {
+
+    if (!isNull(_observer))
+      _observer.disconnect();
 
     _isRendered = _isAttached = false;
 
     component.log('detach', { _isAttached, _isRendered });
 
-    next(component);
-  });
+    hooks.detach(component);
+  };
 
-  hooks.initialize = decorate(hooks.initialize, (next, component, properties) => {
+  component.attach = () => {
 
-    component.log('initialize', { id: element.id, _isAttached, _isRendered, old: properties, new: properties });
 
-    if (!next(component, properties))
-      return;
+    hooks.attach(component, (shouldRender = true) => {
 
-    _properties = properties;
+      component.log('after attach', _properties, { _isAttached, _isRendered, shouldRender });
 
-    hooks.render(component);
-  });
+      _isAttached = true;
 
-  hooks.render = decorate(hooks.render, (next, component) => {
+      if (!_isRendered && shouldRender)
+        component.render();
+
+      if (!isNull(_observer))
+        _observer.observe(element, { attributes: true, attributeOldValue: true });
+
+    });
+  };
+
+  component.render = () => {
+
+    component.log('render()', { _isAttached, _isRendered }, _properties);
 
     if (!_isAttached)
       return;
 
-    component.log('render', { _isAttached, _isRendered }, _properties);
 
-    next(component);
+    hooks.render(component);
 
     _isRendered = true;
-  });
+  };
 
-  Object.defineProperty(component, 'properties', {
-    get() {
-      return LodashCloneDeep(_properties)
-    },
-    set: hooks.initialize.bind(null, component)
+  component.initialize = (properties, options = {}) => {
+
+    component.log('initialize()');
+
+    assert(isObject(properties), `'properties' must be an object`);
+    assert(isObject(options), `'options' must be an object`);
+
+    assert(!_isInitializing, `Cannot call initialize during initialization`);
+
+    const oldProperties = component.properties;
+
+    _isInitializing = true;
+
+    const { partial = false } = options;
+
+    let newProperties = !partial
+      ? clone(properties)
+      : Object.assign({}, _properties, properties);
+
+    newProperties = Object.keys(newProperties)
+      .filter(key => _propertiesKeys.includes(key))
+      .reduce((before, key) => Object.assign(before, { [key]: newProperties[key]}), {});
+
+    const shouldRender = hooks.initialize(component, newProperties, oldProperties);
+
+    Object.assign(_properties, newProperties);
+
+    _isInitializing = false;
+
+    if (shouldRender)
+      component.render();
+
+  };
+
+  component.isPwet = true;
+
+  Object.freeze(component);
+
+  properties = Object.keys(properties).reduce((before, key) => {
+
+    const property = properties[key](component);
+
+    let { get, set, configurable } = property;
+
+    if (isUndefined(configurable))
+      property.configurable = true;
+
+    Object.defineProperty(element, key, {
+      get: () => _properties[key],
+      set: (newValue) => component.initialize({ [key]: newValue }, { partial: true })
+    });
+
+    property.enumerable = true;
+
+    before[key] = property;
+
+    return before;
+  }, {});
+
+  let _propertiesKeys = Object.keys(properties);
+  let _properties = Object.defineProperties({}, properties);
+
+  //component.initialize(_properties, _properties);
+
+  /**
+   * Observe attributes with MutationObserver instead of using attributeChangedCallback and its observedAttributes.
+   * It fires only one time when multiple attributes are changed
+   * @type {MutationObserver}
+   * @private
+   */
+  const _observer = isEmpty(attributes) ? null : new MutationObserver(mutations => {
+
+    if (_isInitializing)
+      return;
+
+    mutations = mutations
+      .filter(({ attributeName }) => _attributesNames.includes(attributeName))
+      .map(({ attributeName:name, oldValue }) => ({
+        name,
+        oldValue,
+        value: element.getAttribute(name)
+      }))
+      .filter(({ value, oldValue }) => !isEqualTo(value, oldValue));
+
+    if (isEmpty(mutations))
+      return;
+
+    component.log('attributesChanged', mutations.map(({ name, value }) => `${name}=${value}`));
+
+    //attributes[attributeName](this.pwet, newValue, oldValue);
+
+    Promise.all(mutations.map(({ name, value, oldValue }) => {
+      return attributes[name](component, value, oldValue);
+    })).then(all => {
+
+      let mustInitialize = false;
+
+      const properties = all.reduce((before, result) => {
+
+        if (isPlainObject(result)) {
+          mustInitialize = true;
+          Object.assign(before, result);
+        }
+
+        return before;
+      }, {});
+
+      component.log('attributesChanged => properties', properties)
+      if (mustInitialize)
+        component.initialize(properties);
+    });
   });
 
   return component;

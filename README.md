@@ -1,6 +1,6 @@
 # Pwet
 
-Utility for building HTML [custom elements](https://www.w3.org/TR/custom-elements).
+[Work In Progress] Utility for building HTML [custom elements](https://www.w3.org/TR/custom-elements).
 
 ## Examples
 
