@@ -6,22 +6,28 @@ import { decorate, clone } from './utilities';
 
 const Component = (component = {}) => {
 
-  const { element, hooks, attributes = {} } = component;
-  let { properties = {} } = component;
+  console.error('Component.create()');
+
+  const { element, definition, hooks, attributes = {} } = component;
+  let { properties = {} } = definition;
+  let { verbose } = definition;
   let _isAttached = false;
   let _isRendered = false;
   let _isInitializing = false;
+  let _whenInitialized;
 
   const _attributesNames = Object.freeze(Object.keys(attributes));
 
+  const _getProperties = () => {
+
+    assert(!_isInitializing, `Cannot get properties during initialization`);
+
+    return clone(_properties)
+  };
+
 
   Object.defineProperties(component, {
-    properties: { get: () => {
-
-      assert(!_isInitializing, `Cannot get properties during initialization`);
-
-      return clone(_properties)
-    } },
+    properties: { get: _getProperties },
     isRendered: { get: () => _isRendered  },
     isInitializing: { get: () => _isInitializing  },
     isAttached: { get: () => _isAttached  }
@@ -29,41 +35,52 @@ const Component = (component = {}) => {
 
   component.detach = () => {
 
-    if (!isNull(_observer))
-      _observer.disconnect();
+    if (!isNull(_attributeObserver))
+      _attributeObserver.disconnect();
 
     _isRendered = _isAttached = false;
 
-    component.log('detach', { _isAttached, _isRendered });
+    if (verbose)
+      console.log('detach', { _isAttached, _isRendered });
 
     hooks.detach(component);
   };
 
   component.attach = () => {
 
+    const _attach = () => {
 
-    hooks.attach(component, (shouldRender = true) => {
+      hooks.attach(component, (shouldRender = true) => {
 
-      component.log('after attach', _properties, { _isAttached, _isRendered, shouldRender });
+        if (verbose)
+          console.log('attach', _properties, { _isAttached, _isRendered, shouldRender });
 
-      _isAttached = true;
+        _isAttached = true;
 
-      if (!_isRendered && shouldRender)
-        component.render();
+        if (!_isRendered && shouldRender)
+          component.render();
 
-      if (!isNull(_observer))
-        _observer.observe(element, { attributes: true, attributeOldValue: true });
+        if (!isNull(_attributeObserver))
+          _attributeObserver.observe(element, { attributes: true, attributeOldValue: true });
 
-    });
+      });
+    };
+
+
+    if (!_isInitializing)
+      return _attach();
+
+    _whenInitialized.then(_attach);
+
   };
 
   component.render = () => {
 
-    component.log('render()', { _isAttached, _isRendered }, _properties);
+    if (verbose)
+      console.log('render()', { _isAttached, _isRendered, properties: JSON.stringify(_properties), state: JSON.stringify(component.state) });
 
     if (!_isAttached)
       return;
-
 
     hooks.render(component);
 
@@ -72,36 +89,52 @@ const Component = (component = {}) => {
 
   component.initialize = (properties, options = {}) => {
 
-    component.log('initialize()');
-
     assert(isObject(properties), `'properties' must be an object`);
     assert(isObject(options), `'options' must be an object`);
 
+    const { partial = false } = options;
+
+    if (verbose)
+      console.log('initialize()', { _isInitializing, properties, partial });
+
     assert(!_isInitializing, `Cannot call initialize during initialization`);
+
+    if (_isInitializing)
+      return void Object.assign(_properties, properties);
 
     const oldProperties = component.properties;
 
-    _isInitializing = true;
+    _whenInitialized = new Promise((resolve, reject) => {
 
-    const { partial = false } = options;
+      _isInitializing = true;
+      //console.log('IS INITIALIZING !!!');
 
-    let newProperties = !partial
-      ? clone(properties)
-      : Object.assign({}, _properties, properties);
+      const { partial = false } = options;
 
-    newProperties = Object.keys(newProperties)
-      .filter(key => _propertiesKeys.includes(key))
-      .reduce((before, key) => Object.assign(before, { [key]: newProperties[key]}), {});
+      let newProperties = !partial
+        ? clone(properties)
+        : Object.assign({}, _properties, properties);
 
-    const shouldRender = hooks.initialize(component, newProperties, oldProperties);
+      newProperties = Object.keys(newProperties)
+        .filter(key => _propertiesKeys.includes(key))
+        .reduce((before, key) => Object.assign(before, { [key]: newProperties[key]}), {});
 
-    Object.assign(_properties, newProperties);
+      hooks.initialize(component, newProperties, oldProperties, (shouldRender = true) => {
 
-    _isInitializing = false;
+        Object.assign(_properties, newProperties);
 
-    if (shouldRender)
-      component.render();
+        _isInitializing = false;
+        //console.log('IS NO MORE INITIALIZING');
 
+        resolve();
+
+        if (shouldRender)
+          component.render();
+        else
+          console.warn('initialize has not rendered component');
+
+      });
+    });
   };
 
   component.isPwet = true;
@@ -110,11 +143,12 @@ const Component = (component = {}) => {
 
   properties = Object.keys(properties).reduce((before, key) => {
 
-    const property = properties[key](component);
+    let property = properties[key](component);
 
-    let { get, set, configurable } = property;
+    if (!isPlainObject(property))
+      property = { value: property };
 
-    if (isUndefined(configurable))
+    if (isUndefined(property.configurable))
       property.configurable = true;
 
     Object.defineProperty(element, key, {
@@ -134,13 +168,9 @@ const Component = (component = {}) => {
 
   //component.initialize(_properties, _properties);
 
-  /**
-   * Observe attributes with MutationObserver instead of using attributeChangedCallback and its observedAttributes.
-   * It fires only one time when multiple attributes are changed
-   * @type {MutationObserver}
-   * @private
-   */
-  const _observer = isEmpty(attributes) ? null : new MutationObserver(mutations => {
+  // Use of MutationObserver instead of observedAttributes because
+  // the call to initialize is debounced when multiple changes occurs at the same time.
+  const _attributeObserver = isEmpty(attributes) ? null : new MutationObserver(mutations => {
 
     if (_isInitializing)
       return;
@@ -157,7 +187,8 @@ const Component = (component = {}) => {
     if (isEmpty(mutations))
       return;
 
-    component.log('attributesChanged', mutations.map(({ name, value }) => `${name}=${value}`));
+    if (verbose)
+      console.log('attributesChanged', mutations.map(({ name, value }) => `${name}=${value}`));
 
     //attributes[attributeName](this.pwet, newValue, oldValue);
 
@@ -177,10 +208,13 @@ const Component = (component = {}) => {
         return before;
       }, {});
 
-      component.log('attributesChanged => properties', properties)
+      if (verbose)
+        console.log('attributesChanged => properties', properties);
+
       if (mustInitialize)
-        component.initialize(properties);
+        component.initialize(properties, { partial: true });
     });
+
   });
 
   return component;

@@ -1,25 +1,26 @@
-import { isObject, isArray, isNull } from 'kwak';
+import { isObject, isArray, isNull, isEmpty, isFunction, assert } from 'kwak';
 
 export const clone = input =>
   !isArray(input)
     ? (isObject(input) && !isNull(input)
-      ? Object.assign({}, input)
-      : input)
+    ? Object.assign({}, input)
+    : input)
     : input.map(clone);
 
 export const noop = () => {};
 export const identity = arg => arg;
 export const toggle = input => !input;
-export const not = toggle;
-export const isAttached = element => {
+export const not = fn => (...args) => !fn(...args);
+export const isAttached = (element, container = document) => {
 
-  if (element === document)
-    return true;
-
-  element = element.parentNode;
-  if (element)
-    return isAttached(element);
-
-  return false;
+  return container.contains(element);
 };
-export const decorate = (func, decorator, ...args) => decorator.bind(null, func, ...args);
+
+export const decorate = (before, ...decorators) => {
+
+  assert(isFunction(before), `'before' must be a function`);
+
+  assert(!isEmpty(decorators) && decorators.every(isFunction), `decorate only accepts functions as parameters`);
+
+  return decorators.reduce((before, fn) => fn.bind(null, before), before);
+};
