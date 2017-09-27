@@ -141,14 +141,9 @@ Definition.defaultHooks = {
 
 const defineComponent = (definition, options = {}) => {
 
-  //assert(isString(tagName), `'tagName' must be a string`);
-
   definition = Definition(definition);
 
   let { tagName } = definition;
-
-
-  console.error('tagName:', tagName);
 
   if (isString(options)) {
     tagName = options;

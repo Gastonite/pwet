@@ -6,8 +6,6 @@ import { decorate, clone } from './utilities';
 
 const Component = (component = {}) => {
 
-  console.error('Component.create()');
-
   const { element, definition, hooks, attributes = {} } = component;
   let { properties = {} } = definition;
   let { verbose } = definition;
@@ -130,8 +128,12 @@ const Component = (component = {}) => {
 
         if (shouldRender)
           component.render();
-        else
-          console.warn('initialize has not rendered component');
+        else {
+
+          if (verbose)
+            console.warn('initialize has not rendered component');
+
+        }
 
       });
     });
