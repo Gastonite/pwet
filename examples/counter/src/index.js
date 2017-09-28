@@ -1,10 +1,10 @@
-import '../../src/polyfills';
-import Component from '../../src/component';
-import Counter from './counter';
+'use strict';
+
+import './components/counter';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  Component.define(Counter);
+  //Component.define(Counter);
 
   const noState = document.getElementById('no-state');
   const property = document.getElementById('property');

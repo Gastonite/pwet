@@ -43,10 +43,16 @@ module.exports = (env) => {
     }
   };
 
-  const loaders = [
-    {test: /\.js$/, use: 'babel-loader'},
-    {test: /\.styl$/, use: ['css-loader', 'stylus-relative-loader']}
-  ];
+  const module = {
+    loaders: [
+      {test: /\.js$/, use: 'babel-loader'},
+      {test: /\.styl$/, use: [
+        'to-string-loader',
+        'css-loader',
+        'stylus-loader'
+      ]}
+    ]
+  };
 
   const plugins = [new Webpack.NamedModulesPlugin()];
 
@@ -76,14 +82,20 @@ module.exports = (env) => {
     new ExtractTextPlugin("style.css")
   );
 
+
+  const resolve = {
+    alias: {
+      pwet: Path.resolve(__dirname, '../..')
+    }
+  };
+
   return {
     entry,
     output,
     devtool,
     devServer,
-    module: {
-      loaders
-    },
+    module,
+    resolve,
     plugins
   };
 

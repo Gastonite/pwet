@@ -13,11 +13,13 @@ const Component = (component = {}) => {
   let _isRendered = false;
   let _isInitializing = false;
   let _whenInitialized;
+  let _properties;
 
   const _attributesNames = Object.freeze(Object.keys(attributes));
 
   const _getProperties = () => {
 
+    assert(!isUndefined(_properties), `Cannot get properties during creation`);
     assert(!_isInitializing, `Cannot get properties during initialization`);
 
     return clone(_properties)
@@ -166,7 +168,7 @@ const Component = (component = {}) => {
   }, {});
 
   let _propertiesKeys = Object.keys(properties);
-  let _properties = Object.defineProperties({}, properties);
+  _properties = Object.defineProperties({}, properties);
 
   //component.initialize(_properties, _properties);
 

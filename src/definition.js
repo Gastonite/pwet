@@ -2,7 +2,7 @@ import LodashKebabCase from 'lodash.kebabcase';
 import { noop, identity, decorate, clone } from './utilities';
 import Component from './component';
 
-import { assert, isString, isArray, isEmpty, isElement, isObject, isUndefined, isFunction, isDeeplyEqual } from 'kwak';
+import { assert, isString, isPlainObject, isArray, isEmpty, isElement, isObject, isUndefined, isFunction, isDeeplyEqual } from 'kwak';
 
 const _definitions = [];
 
@@ -25,7 +25,7 @@ const _parseHooks = (hooks = {}, defaultHooks = {}) => {
 
 const Definition = (options = {}) => {
 
-  assert(isObject(options), `'options' must be an object`);
+  options = Definition.parseDefinition(options);
 
   if (Definition.isDefinition(options))
     return options;
@@ -68,7 +68,7 @@ const Definition = (options = {}) => {
   });
 
   // Style
-  style = style.toString();
+  assert(isUndefined(style) || isString(style), `'style' must be a string`);
 
   // Hooks
   const hooks = _parseHooks(options.hooks, Definition.defaultHooks);
@@ -83,8 +83,7 @@ const Definition = (options = {}) => {
         definition,
         style: definition.style,
         hooks: clone(hooks),
-        attributes,
-        properties
+        attributes
       });
     }
     connectedCallback() {
@@ -107,7 +106,25 @@ const Definition = (options = {}) => {
     verbose
   };
 
+  Object.freeze(definition);
+
   _definitions.push(definition);
+
+  return definition;
+};
+
+Definition.parseDefinition = (definition = {}) => {
+
+  if (isFunction(definition)) {
+    definition = {
+      ...definition,
+      hooks: {
+        ...definition.hooks,
+        create: definition
+      }
+    };
+  }
+  assert(isObject(definition), `'definition' must be an object`);
 
   return definition;
 };
@@ -116,44 +133,19 @@ Definition.getDefinition = input => _definitions.find(definition => definition.t
 Definition.isDefinition = input => _definitions.includes(input);
 Definition.defaultHooks = {
   create: Component,
-  define: (tagName, { type }, options) => void customElements.define(tagName, type, options),
+  define: identity,
   attach: (component, attach) => attach(),
   detach: noop,
   render: noop,
-  initialize: (component, properties, oldProperties) => {
+  initialize: (component, properties, oldProperties, initialize) => {
 
     const arePropertiesEqual = isDeeplyEqual(properties, oldProperties);
 
     if (!arePropertiesEqual)
       console.warn('initialize aborted because properties are unchanged');
 
-    return !arePropertiesEqual
+    initialize(!component.isRendered || !arePropertiesEqual);
   }
 };
 
-
-const defineComponent = (definition, options = {}) => {
-
-  definition = Definition(definition);
-
-  let { tagName } = definition;
-
-  if (isString(options)) {
-    tagName = options;
-    options = arguments.length > 2 ? arguments[2] : null;
-  }
-
-  assert(isObject(options), `'options' must be an object`);
-
-  definition.hooks.define(tagName, definition, options);
-
-  Object.freeze(definition);
-
-  return definition;
-};
-
-
-export {
-  Definition as default,
-  defineComponent
-};
+export default Definition;

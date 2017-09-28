@@ -6,32 +6,51 @@ import { decorate } from '../../../../../src/utilities';
 
 const exampleDefinition = {
   properties: {
-    isVisible: {
+    isVisible: ({ element }) => ({
       configurable: true,
-      get(component) {
-
+      get() {
         console.log('get isVisible()');
-        return component.properties.isVisible;
+        return element.hasAttribute('visible');
       },
-      set(component, newValue) {
+      set(newValue) {
         console.log('set isVisible()', newValue);
-        component.properties = Object.assign(component.properties, {
-          isVisible: newValue
-        });
+
+        if (!newValue)
+          element.removeAttribute('visible');
+        else
+          element.setAttribute('visible', newValue);
       }
-    }
+    }),
+    color: ({ element }) => ({
+      configurable: true,
+      get() {
+        console.log('get color()');
+        return element.getAttribute('color');
+      },
+      set(newValue) {
+        console.log('set color()', newValue);
+
+        if (!newValue)
+          element.removeAttribute('color');
+        else
+          element.setAttribute('color', newValue);
+      }
+    })
   },
   attributes: {
-    visible: ({ element, log }, value, oldValue) => {
+    visible: ({ element, render }, value, oldValue) => {
 
-      log('[visible] changed', oldValue, '=>', value);
+      console.error('[visible] changed', oldValue, '=>', value);
 
-      element.isVisible = value === '';
+      //element.isVisible = value === '';
+      render()
+
     },
-    color: ({ element, log }, value, oldValue) => {
+    color: ({ element, render }, value, oldValue) => {
 
-      log('[color] changed', value);
-      element.color = value
+      console.error('[color] changed', value);
+      //element.color = value
+      render()
     }
   },
   hooks: {
@@ -39,24 +58,16 @@ const exampleDefinition = {
 
       component = next(component);
 
-      const { element, log } = component;
+      const { element } = component;
 
       //console.log('create', Object.getOwnPropertyDescriptor(element, 'isVisible'))
 
-      element.attachShadow({ mode: 'open' })
+      element.attachShadow({ mode: 'open' });
 
-      log('shadowRoot', element.children.length, element.shadowRoot);
+      console.log('shadowRoot', element.children.length, element.shadowRoot);
 
       return component
     }),
-
-    attach: (component) => {
-
-
-    },
-    detach: () => {
-
-    },
     render: ({ element, properties }) => {
 
       let variables = ':host {';

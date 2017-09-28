@@ -1,11 +1,11 @@
 'use strict';
 
-import { Definition } from '../../../../../src';
+import { defineComponent } from '../../../../../src';
 import Example from './example';
 import style from './example.styl';
 
-export default Definition(Object.assign(Example, {
-  id: 'example',
+export default defineComponent(Object.assign(Example, {
+  tagName: 'example',
   style,
   verbose: true
 }));

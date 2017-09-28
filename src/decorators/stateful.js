@@ -2,12 +2,11 @@
 
 import { assert, isPlainObject, isFunction } from "kwak";
 import { decorate, clone } from '../utilities';
+import Definition from '../definition';
 
-const StatefulDefinition = (next, definition = {}) => {
+const StatefulDefinition = (definition) => {
 
-  definition = next(definition);
-
-  assert(isPlainObject(definition), `'definition' must be a plain object`);
+  definition = Definition.parseDefinition(definition);
 
   const { hooks, initialState = {}, observeState, updaters = {} } = definition;
 
