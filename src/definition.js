@@ -30,8 +30,8 @@ const Definition = (options = {}) => {
   if (Definition.isDefinition(options))
     return options;
 
-  const { properties = {}, attributes = {}, dependencies = {}, style, verbose } = options;
-  let { tagName, type = HTMLElement } = options;
+  const { properties = {}, attributes = {}, dependencies = {}, verbose } = options;
+  let { tagName, type = HTMLElement, style = '' } = options;
 
   assert(isString(tagName) && !isEmpty(tagName), `'tagName' must be a non empty string`);
 
@@ -66,11 +66,9 @@ const Definition = (options = {}) => {
 
     assert(isFunction(attribute), `Invalid 'attributes': ${key}' must be a function`);
   });
-  //// Dependencies
-  //assert(isObject(dependencies), `'dependencies' must be an object`);
 
   // Style
-  assert(isUndefined(style) || (isString(style)), `'style' must be a string`);
+  style = style.toString();
 
   // Hooks
   const hooks = _parseHooks(options.hooks, Definition.defaultHooks);
@@ -86,8 +84,7 @@ const Definition = (options = {}) => {
         style: definition.style,
         hooks: clone(hooks),
         attributes,
-        properties,
-        //dependencies
+        properties
       });
     }
     connectedCallback() {
@@ -127,12 +124,8 @@ Definition.defaultHooks = {
 
     const arePropertiesEqual = isDeeplyEqual(properties, oldProperties);
 
-    //component.log('default initialize', { old: oldProperties, new: properties, arePropertiesEqual });
-
-
     if (!arePropertiesEqual)
       console.warn('initialize aborted because properties are unchanged');
-
 
     return !arePropertiesEqual
   }
@@ -155,6 +148,8 @@ const defineComponent = (definition, options = {}) => {
   definition.hooks.define(tagName, definition, options);
 
   Object.freeze(definition);
+
+  return definition;
 };
 
 
