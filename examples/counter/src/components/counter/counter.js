@@ -1,119 +1,97 @@
 'use strict';
 
-import { Component, Definition } from 'pwet';
+import { decorate } from 'pwet/src/utilities';
+import { isInteger, isUndefined } from 'kwak';
+import style from './counter.css';
 
 const Counter = (component) => {
 
-  component = Component(component);
+  const { element, hooks } = component;
 
-  let _interval;
+  let _addButton;
+  let _removeButton;
+  let _counterSpan;
 
-  const initialize = (component, newProperties, oldProperties, initialize) => {
+  const _add = () => element.start += element.by;
+  const _remove = () => element.start -= element.by;
 
-    console.log('Counter.initialize() before', newProperties);
+  hooks.attach = () => {
 
-    const { state } = component;
-
-    if (newProperties.start !== state.count)
-      component.state = { ...state, count: newProperties.start };
-
-    initialize(!component.isRendered);
-
-    console.log('Counter.initialize() after', component.state);
+    _addButton.addEventListener('click', _add);
+    _removeButton.addEventListener('click', _remove);
   };
 
+  hooks.detach = () => {
 
-  const _incrementBy = value => () => {
-    const { element, state } = component;
-
-    component.state = { ...state, count: state.count + element.by };
+    _addButton.removeEventListener('click', _add);
+    _removeButton.removeEventListener('click', _remove);
   };
 
-  const attach = ({ element, state }, attach) => {
-    console.log('Counter.attach()', state);
+  hooks.render = component => {
 
-    _interval = setInterval(_incrementBy(element.by), 1000);
+    console.warn('Counter.render()', component);
 
-    attach(true);
+    if (isUndefined(_removeButton)) {
+      _removeButton = document.createElement('button');
+      _removeButton.textContent = '-';
+      component.root.appendChild(_removeButton);
+    }
 
-    setTimeout(detach, 6000)
+    if (isUndefined(_counterSpan)) {
+      _counterSpan = document.createElement('span');
+      _counterSpan.style.padding = '0 10px';
+      component.root.appendChild(_counterSpan);
+    }
+
+    _counterSpan.textContent = element.start;
+
+    if (isUndefined(_addButton)) {
+      _addButton = document.createElement('button');
+      _addButton.textContent = '+';
+      component.root.appendChild(_addButton);
+    }
   };
-
-  const detach = () => {
-    console.log('Counter.detach()');
-
-    clearInterval(_interval);
-  };
-
-  Object.assign(component.hooks, {
-    attach,
-    detach,
-    initialize
-  });
 
   return component;
 };
 
 
-//component => {
-//
-//  const { element } = component;
-//  console.log('Counter() ', component.state);
-//
-//
-//
-//  return {
-//    initialize,
-//    attach,
-//    detach
-//  };
-//};
-//
-//Counter.decorators = [StatefulComponent];
-//
-Counter.hooks = {};
-
-Counter.hooks.render = ({ element, state }) => {
-
-  element.innerHTML = JSON.stringify(state, null, 2)
-};
-
 Counter.properties = {
-  start: ({ element }) => ({
-    get: () => {
-      const value = parseInt(element.getAttribute('start'));
-
-      return isNaN(value) ? 0 : value;
-    },
+  start: ({ element }, value = element.getAttribute('data-start') || 0) => ({
+    get: () => value,
     set: (newValue) => {
-      element.getAttribute('start', newValue);
+
+      newValue = parseInt(newValue);
+
+      if (isInteger(newValue))
+        value = newValue
     }
   }),
-  by: ({ element }) => ({
-    get: () => {
-      const value = parseInt(element.getAttribute('by'));
-
-      return isNaN(value) ? 1 : value;
-    },
+  by: ({ element }, value = element.getAttribute('data-by') || 1) => ({
+    get: () => value,
     set: (newValue) => {
-      element.getAttribute('by', newValue);
+
+      newValue = parseInt(newValue);
+
+      if (isInteger(newValue))
+        value = newValue
     }
   })
 };
 
 Counter.attributes = {
-  start: (component, value, oldValue) => {
-
+  'data-start': ({ element }, value, oldValue) => {
+    return { start: value }
   },
-  by: (component, value, oldValue) => {
-
+  'data-by': ({ element }, value, oldValue) => {
+    return { by: value }
   }
 };
 
-Counter.initialState = {
-  count: 0
-};
+//Counter.verbose = true;
+Counter.tagName = 'x-counter';
 
-Counter.tagName = 'counter';
+Counter.style = style;
+
 
 export default Counter;

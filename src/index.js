@@ -1,10 +1,15 @@
 'use strict';
 
-import Definition from './definition';
+import { default as Definition, $pwet } from './definition';
 import Component from './component';
 import { assert, isString, isObject } from 'kwak';
 
-
+/**
+ * Defines a component from a definition
+ * @param definition
+ * @param options
+ * @returns {*}
+ */
 const defineComponent = (definition, options = {}) => {
 
   definition = Definition(definition);
@@ -18,9 +23,6 @@ const defineComponent = (definition, options = {}) => {
 
   assert(isObject(options), `'options' must be an object`);
 
-  definition = definition.hooks.define(definition);
-
-
   customElements.define(definition.tagName, definition.type, options);
 
   return definition;
@@ -29,5 +31,6 @@ const defineComponent = (definition, options = {}) => {
 export {
   defineComponent,
   Component,
-  Definition
+  Definition,
+  $pwet
 };

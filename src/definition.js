@@ -1,49 +1,123 @@
 import LodashKebabCase from 'lodash.kebabcase';
 import { noop, identity, decorate, clone } from './utilities';
 import Component from './component';
+import pipe from 'ramda/src/pipe';
 
 import { assert, isString, isPlainObject, isArray, isEmpty, isElement, isObject, isUndefined, isFunction, isDeeplyEqual } from 'kwak';
 
+
+
 const _definitions = [];
+const $pwet = Symbol('__pwet');
 
-const _parseHooks = (hooks = {}, defaultHooks = {}) => {
+const Definition = (definition = {}) => {
 
-  assert(isObject(hooks), `'hooks' must be an object`);
-  assert(isObject(defaultHooks), `'defaultHooks' must be an object`);
+  if (Definition.isDefinition(definition))
+    return definition;
 
-  return Object.keys(defaultHooks).reduce((before, key) => {
+  definition = isArray(definition)
+    ? Definition.fromArray(definition)
+    : Definition.parseDefinition(definition);
 
-    const hook = hooks[key] || defaultHooks[key];
+  definition.type = class extends definition.type {
+    constructor() {
 
-    assert(isFunction(hook), `'${key}' must be a function`);
+      super();
 
-    before[key] = hook;
+      this[$pwet] = definition.hooks.create({
+        element: this,
+        definition,
+        hooks: clone(definition.hooks)
+      });
+    }
+    connectedCallback() {
 
-    return before;
-  }, {});
+      this[$pwet].attach(this.pwet);
+    }
+    disconnectedCallback() {
+
+      this[$pwet].detach(this.pwet);
+    }
+  };
+
+  definition = definition.hooks.define(definition);
+
+  Object.freeze(definition);
+
+  _definitions.push(definition);
+
+  return definition;
 };
 
-const Definition = (options = {}) => {
 
-  options = Definition.parseDefinition(options);
+Definition.fromArray = definition => {
 
-  if (Definition.isDefinition(options))
-    return options;
+  assert(isArray(definition), `'definition' must be an array`);
+  //assert(definition.every(isFunction), `'definition' array must only contains functions`);
 
-  const { properties = {}, attributes = {}, dependencies = {}, verbose } = options;
-  let { tagName, type = HTMLElement, style = '' } = options;
+  if (!definition.includes(Component))
+    definition.push(Component);
 
-  assert(isString(tagName) && !isEmpty(tagName), `'tagName' must be a non empty string`);
+  return Definition.parseDefinition(
+    Object.assign(
+      pipe(...definition.filter(isFunction)),
+      definition.reduce((before, after) => {
+
+        const hooks = {...before.hooks};
+
+        if (isObject(after.hooks)) {
+
+          const hooksOverride = {};
+
+          if (isFunction(before.hooks.define) && isFunction(after.hooks.define))
+            hooksOverride.define = pipe(before.hooks.define, after.hooks.define);
+
+          Object.assign(hooks, after.hooks, hooksOverride);
+        }
+
+        return Object.assign(before, after, { hooks });
+      }, { hooks: {} })
+    )
+  )
+};
+
+Definition.parseDefinition = (definition = {}) => {
+
+  console.log('Definition.parseDefinition()')
+  console.log('Definition.parseDefinition()')
+
+  if (isFunction(definition)) {
+
+    if (isUndefined(definition.tagName) && isString(definition.name))
+      definition.tagName = LodashKebabCase(definition.name);
+
+    definition = {
+      ...definition,
+      hooks: {
+        ...definition.hooks,
+        create: definition
+      }
+    };
+  }
+
+  assert(isObject(definition), `'definition' must be an object`);
+
+  const { properties = {}, hooks = {}, attributes = {}, dependencies = {}, verbose } = definition;
+  let { tagName, type = HTMLElement, style = '' } = definition;
+
 
   // Tag
+  assert(isString(tagName) && !isEmpty(tagName), `'tagName' must be a non empty string`);
   tagName = LodashKebabCase(tagName.toLowerCase());
   if (!tagName.includes('-'))
     tagName = `x-${tagName}`;
   assert(!Definition.getDefinition(tagName), `'${tagName}' definition already exists`);
 
+
   // Type
   assert(isFunction(type) && (type === HTMLElement || isElement(type.prototype)),
     `'type' must be a subclass of HTMLElement`);
+
 
   // Properties
   assert(isObject(properties), `'properties' must be an object`);
@@ -53,11 +127,12 @@ const Definition = (options = {}) => {
     if (!isFunction(property)) {
 
       if (!isPlainObject(property))
-        property = { value: property };
+        property = { value: property, writable: true };
 
       properties[key] = () => property;
     }
   });
+
 
   // Attributes
   assert(isObject(attributes), `'attributes' must be an object`);
@@ -67,85 +142,50 @@ const Definition = (options = {}) => {
     assert(isFunction(attribute), `Invalid 'attributes': ${key}' must be a function`);
   });
 
+
   // Style
   assert(isUndefined(style) || isString(style), `'style' must be a string`);
 
+
   // Hooks
-  const hooks = _parseHooks(options.hooks, Definition.defaultHooks);
+  assert(isObject(hooks), `'hooks' must be an object`);
+  Object.keys(Definition.defaultHooks).forEach((key) => {
 
-  type = class extends type {
-    constructor() {
+    const hook = hooks[key] || Definition.defaultHooks[key];
 
-      super();
+    assert(isFunction(hook), `'${key}' must be a function`);
 
-      this.pwet = hooks.create({
-        element: this,
-        definition,
-        style: definition.style,
-        hooks: clone(hooks),
-        attributes
-      });
-    }
-    connectedCallback() {
+    hooks[key] = hook;
+  });
 
-      this.pwet.attach(this.pwet);
-    }
-    disconnectedCallback() {
-
-      this.pwet.detach(this.pwet);
-    }
-  };
-
-  const definition = {
+  return {
+    ...definition,
     tagName,
-    style,
     type,
-    hooks,
-    attributes,
     properties,
-    verbose
+    attributes,
+    dependencies,
+    style,
+    verbose,
+    hooks
   };
-
-  Object.freeze(definition);
-
-  _definitions.push(definition);
-
-  return definition;
-};
-
-Definition.parseDefinition = (definition = {}) => {
-
-  if (isFunction(definition)) {
-    definition = {
-      ...definition,
-      hooks: {
-        ...definition.hooks,
-        create: definition
-      }
-    };
-  }
-  assert(isObject(definition), `'definition' must be an object`);
-
-  return definition;
 };
 
 Definition.getDefinition = input => _definitions.find(definition => definition.tagName === input);
 Definition.isDefinition = input => _definitions.includes(input);
 Definition.defaultHooks = {
   create: Component,
-  define: identity,
-  attach: (component, attach) => attach(),
+  attach: noop,
   detach: noop,
   render: noop,
-  initialize: (component, properties, oldProperties, initialize) => {
+  define: identity,
+  update: (component, properties, oldProperties) => {
 
-    const arePropertiesEqual = isDeeplyEqual(properties, oldProperties);
-
-    if (!arePropertiesEqual)
-      console.warn('initialize aborted because properties are unchanged');
-
-    initialize(!component.isRendered || !arePropertiesEqual);
+    return !component.isRendered || !isDeeplyEqual(properties, oldProperties);
   }
 };
 
-export default Definition;
+export {
+  Definition as default,
+  $pwet
+};

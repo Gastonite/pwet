@@ -60,7 +60,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "8fd1817500257b84468b"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "cc2012bbd7ae2973b13d"; // eslint-disable-line no-unused-vars
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
@@ -726,6 +726,1010 @@
 /************************************************************************/
 /******/ ({
 
+/***/ "../../node_modules/@webcomponents/shadycss/src/common-regex.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/**
+@license
+Copyright (c) 2017 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+const VAR_ASSIGN = /(?:^|[;\s{]\s*)(--[\w-]*?)\s*:\s*(?:((?:'(?:\\'|.)*?'|"(?:\\"|.)*?"|\([^)]*?\)|[^};{])+)|\{([^}]*)\}(?:(?=[;\s}])|$))/gi;
+/* unused harmony export VAR_ASSIGN */
+
+const MIXIN_MATCH = /(?:^|\W+)@apply\s*\(?([^);\n]*)\)?/gi;
+/* unused harmony export MIXIN_MATCH */
+
+const VAR_CONSUMED = /(--[\w-]+)\s*([:,;)]|$)/gi;
+/* unused harmony export VAR_CONSUMED */
+
+const ANIMATION_MATCH = /(animation\s*:)|(animation-name\s*:)/;
+/* unused harmony export ANIMATION_MATCH */
+
+const MEDIA_MATCH = /@media\s(.*)/;
+/* harmony export (immutable) */ __webpack_exports__["a"] = MEDIA_MATCH;
+
+const IS_VAR = /^--/;
+/* unused harmony export IS_VAR */
+
+const BRACKETED = /\{[^}]*\}/g;
+/* unused harmony export BRACKETED */
+
+const HOST_PREFIX = '(?:^|[^.#[:])';
+/* unused harmony export HOST_PREFIX */
+
+const HOST_SUFFIX = '($|[.:[\\s>+~])';
+/* unused harmony export HOST_SUFFIX */
+
+
+/***/ }),
+
+/***/ "../../node_modules/@webcomponents/shadycss/src/css-parse.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* unused harmony export StyleNode */
+/* harmony export (immutable) */ __webpack_exports__["a"] = parse;
+/* harmony export (immutable) */ __webpack_exports__["b"] = stringify;
+/* unused harmony export removeCustomPropAssignment */
+/**
+@license
+Copyright (c) 2017 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+/*
+Extremely simple css parser. Intended to be not more than what we need
+and definitely not necessarily correct =).
+*/
+
+
+
+/** @unrestricted */
+
+class StyleNode {
+  constructor() {
+    /** @type {number} */
+    this['start'] = 0;
+    /** @type {number} */
+    this['end'] = 0;
+    /** @type {StyleNode} */
+    this['previous'] = null;
+    /** @type {StyleNode} */
+    this['parent'] = null;
+    /** @type {Array<StyleNode>} */
+    this['rules'] = null;
+    /** @type {string} */
+    this['parsedCssText'] = '';
+    /** @type {string} */
+    this['cssText'] = '';
+    /** @type {boolean} */
+    this['atRule'] = false;
+    /** @type {number} */
+    this['type'] = 0;
+    /** @type {string} */
+    this['keyframesName'] = '';
+    /** @type {string} */
+    this['selector'] = '';
+    /** @type {string} */
+    this['parsedSelector'] = '';
+  }
+}
+
+
+
+// given a string of css, return a simple rule tree
+/**
+ * @param {string} text
+ * @return {StyleNode}
+ */
+function parse(text) {
+  text = clean(text);
+  return parseCss(lex(text), text);
+}
+
+// remove stuff we don't care about that may hinder parsing
+/**
+ * @param {string} cssText
+ * @return {string}
+ */
+function clean(cssText) {
+  return cssText.replace(RX.comments, '').replace(RX.port, '');
+}
+
+// super simple {...} lexer that returns a node tree
+/**
+ * @param {string} text
+ * @return {StyleNode}
+ */
+function lex(text) {
+  let root = new StyleNode();
+  root['start'] = 0;
+  root['end'] = text.length;
+  let n = root;
+  for (let i = 0, l = text.length; i < l; i++) {
+    if (text[i] === OPEN_BRACE) {
+      if (!n['rules']) {
+        n['rules'] = [];
+      }
+      let p = n;
+      let previous = p['rules'][p['rules'].length - 1] || null;
+      n = new StyleNode();
+      n['start'] = i + 1;
+      n['parent'] = p;
+      n['previous'] = previous;
+      p['rules'].push(n);
+    } else if (text[i] === CLOSE_BRACE) {
+      n['end'] = i + 1;
+      n = n['parent'] || root;
+    }
+  }
+  return root;
+}
+
+// add selectors/cssText to node tree
+/**
+ * @param {StyleNode} node
+ * @param {string} text
+ * @return {StyleNode}
+ */
+function parseCss(node, text) {
+  let t = text.substring(node['start'], node['end'] - 1);
+  node['parsedCssText'] = node['cssText'] = t.trim();
+  if (node['parent']) {
+    let ss = node['previous'] ? node['previous']['end'] : node['parent']['start'];
+    t = text.substring(ss, node['start'] - 1);
+    t = _expandUnicodeEscapes(t);
+    t = t.replace(RX.multipleSpaces, ' ');
+    // TODO(sorvell): ad hoc; make selector include only after last ;
+    // helps with mixin syntax
+    t = t.substring(t.lastIndexOf(';') + 1);
+    let s = node['parsedSelector'] = node['selector'] = t.trim();
+    node['atRule'] = s.indexOf(AT_START) === 0;
+    // note, support a subset of rule types...
+    if (node['atRule']) {
+      if (s.indexOf(MEDIA_START) === 0) {
+        node['type'] = types.MEDIA_RULE;
+      } else if (s.match(RX.keyframesRule)) {
+        node['type'] = types.KEYFRAMES_RULE;
+        node['keyframesName'] = node['selector'].split(RX.multipleSpaces).pop();
+      }
+    } else {
+      if (s.indexOf(VAR_START) === 0) {
+        node['type'] = types.MIXIN_RULE;
+      } else {
+        node['type'] = types.STYLE_RULE;
+      }
+    }
+  }
+  let r$ = node['rules'];
+  if (r$) {
+    for (let i = 0, l = r$.length, r; i < l && (r = r$[i]); i++) {
+      parseCss(r, text);
+    }
+  }
+  return node;
+}
+
+/**
+ * conversion of sort unicode escapes with spaces like `\33 ` (and longer) into
+ * expanded form that doesn't require trailing space `\000033`
+ * @param {string} s
+ * @return {string}
+ */
+function _expandUnicodeEscapes(s) {
+  return s.replace(/\\([0-9a-f]{1,6})\s/gi, function () {
+    let code = arguments[1],
+        repeat = 6 - code.length;
+    while (repeat--) {
+      code = '0' + code;
+    }
+    return '\\' + code;
+  });
+}
+
+/**
+ * stringify parsed css.
+ * @param {StyleNode} node
+ * @param {boolean=} preserveProperties
+ * @param {string=} text
+ * @return {string}
+ */
+function stringify(node, preserveProperties, text = '') {
+  // calc rule cssText
+  let cssText = '';
+  if (node['cssText'] || node['rules']) {
+    let r$ = node['rules'];
+    if (r$ && !_hasMixinRules(r$)) {
+      for (let i = 0, l = r$.length, r; i < l && (r = r$[i]); i++) {
+        cssText = stringify(r, preserveProperties, cssText);
+      }
+    } else {
+      cssText = preserveProperties ? node['cssText'] : removeCustomProps(node['cssText']);
+      cssText = cssText.trim();
+      if (cssText) {
+        cssText = '  ' + cssText + '\n';
+      }
+    }
+  }
+  // emit rule if there is cssText
+  if (cssText) {
+    if (node['selector']) {
+      text += node['selector'] + ' ' + OPEN_BRACE + '\n';
+    }
+    text += cssText;
+    if (node['selector']) {
+      text += CLOSE_BRACE + '\n\n';
+    }
+  }
+  return text;
+}
+
+/**
+ * @param {Array<StyleNode>} rules
+ * @return {boolean}
+ */
+function _hasMixinRules(rules) {
+  let r = rules[0];
+  return Boolean(r) && Boolean(r['selector']) && r['selector'].indexOf(VAR_START) === 0;
+}
+
+/**
+ * @param {string} cssText
+ * @return {string}
+ */
+function removeCustomProps(cssText) {
+  cssText = removeCustomPropAssignment(cssText);
+  return removeCustomPropApply(cssText);
+}
+
+/**
+ * @param {string} cssText
+ * @return {string}
+ */
+function removeCustomPropAssignment(cssText) {
+  return cssText.replace(RX.customProp, '').replace(RX.mixinProp, '');
+}
+
+/**
+ * @param {string} cssText
+ * @return {string}
+ */
+function removeCustomPropApply(cssText) {
+  return cssText.replace(RX.mixinApply, '').replace(RX.varApply, '');
+}
+
+/** @enum {number} */
+const types = {
+  STYLE_RULE: 1,
+  KEYFRAMES_RULE: 7,
+  MEDIA_RULE: 4,
+  MIXIN_RULE: 1000
+};
+/* harmony export (immutable) */ __webpack_exports__["c"] = types;
+
+
+const OPEN_BRACE = '{';
+const CLOSE_BRACE = '}';
+
+// helper regexp's
+const RX = {
+  comments: /\/\*[^*]*\*+([^/*][^*]*\*+)*\//gim,
+  port: /@import[^;]*;/gim,
+  customProp: /(?:^[^;\-\s}]+)?--[^;{}]*?:[^{};]*?(?:[;\n]|$)/gim,
+  mixinProp: /(?:^[^;\-\s}]+)?--[^;{}]*?:[^{};]*?{[^}]*?}(?:[;\n]|$)?/gim,
+  mixinApply: /@apply\s*\(?[^);]*\)?\s*(?:[;\n]|$)?/gim,
+  varApply: /[^;:]*?:[^;]*?var\([^;]*\)(?:[;\n]|$)?/gim,
+  keyframesRule: /^@[^\s]*keyframes/,
+  multipleSpaces: /\s+/g
+};
+
+const VAR_START = '--';
+const MEDIA_START = '@media';
+const AT_START = '@';
+
+/***/ }),
+
+/***/ "../../node_modules/@webcomponents/shadycss/src/style-settings.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return nativeShadow; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return nativeCssVariables; });
+/**
+@license
+Copyright (c) 2017 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+
+
+let nativeShadow = !(window['ShadyDOM'] && window['ShadyDOM']['inUse']);
+let nativeCssVariables;
+
+/**
+ * @param {(ShadyCSSOptions | ShadyCSSInterface)=} settings
+ */
+function calcCssVariables(settings) {
+  if (settings && settings['shimcssproperties']) {
+    nativeCssVariables = false;
+  } else {
+    // chrome 49 has semi-working css vars, check if box-shadow works
+    // safari 9.1 has a recalc bug: https://bugs.webkit.org/show_bug.cgi?id=155782
+    // However, shim css custom properties are only supported with ShadyDOM enabled,
+    // so fall back on native if we do not detect ShadyDOM
+    // Edge 15: custom properties used in ::before and ::after will also be used in the parent element
+    // https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/12414257/
+    nativeCssVariables = nativeShadow || Boolean(!navigator.userAgent.match(/AppleWebKit\/601|Edge\/15/) && window.CSS && CSS.supports && CSS.supports('box-shadow', '0 0 0 var(--foo)'));
+  }
+}
+
+if (window.ShadyCSS && window.ShadyCSS.nativeCss !== undefined) {
+  nativeCssVariables = window.ShadyCSS.nativeCss;
+} else if (window.ShadyCSS) {
+  calcCssVariables(window.ShadyCSS);
+  // reset window variable to let ShadyCSS API take its place
+  window.ShadyCSS = undefined;
+} else {
+  calcCssVariables(window['WebComponents'] && window['WebComponents']['flags']);
+}
+
+/***/ }),
+
+/***/ "../../node_modules/@webcomponents/shadycss/src/style-transformer.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__css_parse_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/css-parse.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__style_util_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/style-util.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__style_settings_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/style-settings.js");
+/**
+@license
+Copyright (c) 2017 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+
+
+ // eslint-disable-line no-unused-vars
+
+
+
+/* Transforms ShadowDOM styling into ShadyDOM styling
+
+* scoping:
+
+  * elements in scope get scoping selector class="x-foo-scope"
+  * selectors re-written as follows:
+
+    div button -> div.x-foo-scope button.x-foo-scope
+
+* :host -> scopeName
+
+* :host(...) -> scopeName...
+
+* ::slotted(...) -> scopeName > ...
+
+* ...:dir(ltr|rtl) -> [dir="ltr|rtl"] ..., ...[dir="ltr|rtl"]
+
+* :host(:dir[rtl]) -> scopeName:dir(rtl) -> [dir="rtl"] scopeName, scopeName[dir="rtl"]
+
+*/
+const SCOPE_NAME = 'style-scope';
+
+class StyleTransformer {
+  get SCOPE_NAME() {
+    return SCOPE_NAME;
+  }
+  // Given a node and scope name, add a scoping class to each node
+  // in the tree. This facilitates transforming css into scoped rules.
+  dom(node, scope, shouldRemoveScope) {
+    // one time optimization to skip scoping...
+    if (node['__styleScoped']) {
+      node['__styleScoped'] = null;
+    } else {
+      this._transformDom(node, scope || '', shouldRemoveScope);
+    }
+  }
+
+  _transformDom(node, selector, shouldRemoveScope) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      this.element(node, selector, shouldRemoveScope);
+    }
+    let c$ = node.localName === 'template' ? (node.content || node._content).childNodes : node.children || node.childNodes;
+    if (c$) {
+      for (let i = 0; i < c$.length; i++) {
+        this._transformDom(c$[i], selector, shouldRemoveScope);
+      }
+    }
+  }
+
+  element(element, scope, shouldRemoveScope) {
+    // note: if using classes, we add both the general 'style-scope' class
+    // as well as the specific scope. This enables easy filtering of all
+    // `style-scope` elements
+    if (scope) {
+      // note: svg on IE does not have classList so fallback to class
+      if (element.classList) {
+        if (shouldRemoveScope) {
+          element.classList.remove(SCOPE_NAME);
+          element.classList.remove(scope);
+        } else {
+          element.classList.add(SCOPE_NAME);
+          element.classList.add(scope);
+        }
+      } else if (element.getAttribute) {
+        let c = element.getAttribute(CLASS);
+        if (shouldRemoveScope) {
+          if (c) {
+            let newValue = c.replace(SCOPE_NAME, '').replace(scope, '');
+            __WEBPACK_IMPORTED_MODULE_1__style_util_js__["c" /* setElementClassRaw */](element, newValue);
+          }
+        } else {
+          let newValue = (c ? c + ' ' : '') + SCOPE_NAME + ' ' + scope;
+          __WEBPACK_IMPORTED_MODULE_1__style_util_js__["c" /* setElementClassRaw */](element, newValue);
+        }
+      }
+    }
+  }
+
+  elementStyles(element, styleRules, callback) {
+    let cssBuildType = element['__cssBuild'];
+    // no need to shim selectors if settings.useNativeShadow, also
+    // a shady css build will already have transformed selectors
+    // NOTE: This method may be called as part of static or property shimming.
+    // When there is a targeted build it will not be called for static shimming,
+    // but when the property shim is used it is called and should opt out of
+    // static shimming work when a proper build exists.
+    let cssText = '';
+    if (__WEBPACK_IMPORTED_MODULE_2__style_settings_js__["b" /* nativeShadow */] || cssBuildType === 'shady') {
+      cssText = __WEBPACK_IMPORTED_MODULE_1__style_util_js__["d" /* toCssText */](styleRules, callback);
+    } else {
+      let { is, typeExtension } = __WEBPACK_IMPORTED_MODULE_1__style_util_js__["a" /* getIsExtends */](element);
+      cssText = this.css(styleRules, is, typeExtension, callback) + '\n\n';
+    }
+    return cssText.trim();
+  }
+
+  // Given a string of cssText and a scoping string (scope), returns
+  // a string of scoped css where each selector is transformed to include
+  // a class created from the scope. ShadowDOM selectors are also transformed
+  // (e.g. :host) to use the scoping selector.
+  css(rules, scope, ext, callback) {
+    let hostScope = this._calcHostScope(scope, ext);
+    scope = this._calcElementScope(scope);
+    let self = this;
+    return __WEBPACK_IMPORTED_MODULE_1__style_util_js__["d" /* toCssText */](rules, function ( /** StyleNode */rule) {
+      if (!rule.isScoped) {
+        self.rule(rule, scope, hostScope);
+        rule.isScoped = true;
+      }
+      if (callback) {
+        callback(rule, scope, hostScope);
+      }
+    });
+  }
+
+  _calcElementScope(scope) {
+    if (scope) {
+      return CSS_CLASS_PREFIX + scope;
+    } else {
+      return '';
+    }
+  }
+
+  _calcHostScope(scope, ext) {
+    return ext ? `[is=${scope}]` : scope;
+  }
+
+  rule(rule, scope, hostScope) {
+    this._transformRule(rule, this._transformComplexSelector, scope, hostScope);
+  }
+
+  /**
+   * transforms a css rule to a scoped rule.
+   *
+   * @param {StyleNode} rule
+   * @param {Function} transformer
+   * @param {string=} scope
+   * @param {string=} hostScope
+   */
+  _transformRule(rule, transformer, scope, hostScope) {
+    // NOTE: save transformedSelector for subsequent matching of elements
+    // against selectors (e.g. when calculating style properties)
+    rule['selector'] = rule.transformedSelector = this._transformRuleCss(rule, transformer, scope, hostScope);
+  }
+
+  /**
+   * @param {StyleNode} rule
+   * @param {Function} transformer
+   * @param {string=} scope
+   * @param {string=} hostScope
+   */
+  _transformRuleCss(rule, transformer, scope, hostScope) {
+    let p$ = rule['selector'].split(COMPLEX_SELECTOR_SEP);
+    // we want to skip transformation of rules that appear in keyframes,
+    // because they are keyframe selectors, not element selectors.
+    if (!__WEBPACK_IMPORTED_MODULE_1__style_util_js__["b" /* isKeyframesSelector */](rule)) {
+      for (let i = 0, l = p$.length, p; i < l && (p = p$[i]); i++) {
+        p$[i] = transformer.call(this, p, scope, hostScope);
+      }
+    }
+    return p$.join(COMPLEX_SELECTOR_SEP);
+  }
+
+  /**
+   * @param {string} selector
+   * @return {string}
+   */
+  _twiddleNthPlus(selector) {
+    return selector.replace(NTH, (m, type, inside) => {
+      if (inside.indexOf('+') > -1) {
+        inside = inside.replace(/\+/g, '___');
+      } else if (inside.indexOf('___') > -1) {
+        inside = inside.replace(/___/g, '+');
+      }
+      return `:${type}(${inside})`;
+    });
+  }
+
+  /**
+   * @param {string} selector
+   * @param {string} scope
+   * @param {string=} hostScope
+   */
+  _transformComplexSelector(selector, scope, hostScope) {
+    let stop = false;
+    selector = selector.trim();
+    // Remove spaces inside of selectors like `:nth-of-type` because it confuses SIMPLE_SELECTOR_SEP
+    let isNth = NTH.test(selector);
+    if (isNth) {
+      selector = selector.replace(NTH, (m, type, inner) => `:${type}(${inner.replace(/\s/g, '')})`);
+      selector = this._twiddleNthPlus(selector);
+    }
+    selector = selector.replace(SLOTTED_START, `${HOST} $1`);
+    selector = selector.replace(SIMPLE_SELECTOR_SEP, (m, c, s) => {
+      if (!stop) {
+        let info = this._transformCompoundSelector(s, c, scope, hostScope);
+        stop = stop || info.stop;
+        c = info.combinator;
+        s = info.value;
+      }
+      return c + s;
+    });
+    if (isNth) {
+      selector = this._twiddleNthPlus(selector);
+    }
+    return selector;
+  }
+
+  _transformCompoundSelector(selector, combinator, scope, hostScope) {
+    // replace :host with host scoping class
+    let slottedIndex = selector.indexOf(SLOTTED);
+    if (selector.indexOf(HOST) >= 0) {
+      selector = this._transformHostSelector(selector, hostScope);
+      // replace other selectors with scoping class
+    } else if (slottedIndex !== 0) {
+      selector = scope ? this._transformSimpleSelector(selector, scope) : selector;
+    }
+    // mark ::slotted() scope jump to replace with descendant selector + arg
+    // also ignore left-side combinator
+    let slotted = false;
+    if (slottedIndex >= 0) {
+      combinator = '';
+      slotted = true;
+    }
+    // process scope jumping selectors up to the scope jump and then stop
+    let stop;
+    if (slotted) {
+      stop = true;
+      if (slotted) {
+        // .zonk ::slotted(.foo) -> .zonk.scope > .foo
+        selector = selector.replace(SLOTTED_PAREN, (m, paren) => ` > ${paren}`);
+      }
+    }
+    selector = selector.replace(DIR_PAREN, (m, before, dir) => `[dir="${dir}"] ${before}, ${before}[dir="${dir}"]`);
+    return { value: selector, combinator, stop };
+  }
+
+  _transformSimpleSelector(selector, scope) {
+    let p$ = selector.split(PSEUDO_PREFIX);
+    p$[0] += scope;
+    return p$.join(PSEUDO_PREFIX);
+  }
+
+  // :host(...) -> scopeName...
+  _transformHostSelector(selector, hostScope) {
+    let m = selector.match(HOST_PAREN);
+    let paren = m && m[2].trim() || '';
+    if (paren) {
+      if (!paren[0].match(SIMPLE_SELECTOR_PREFIX)) {
+        // paren starts with a type selector
+        let typeSelector = paren.split(SIMPLE_SELECTOR_PREFIX)[0];
+        // if the type selector is our hostScope then avoid pre-pending it
+        if (typeSelector === hostScope) {
+          return paren;
+          // otherwise, this selector should not match in this scope so
+          // output a bogus selector.
+        } else {
+          return SELECTOR_NO_MATCH;
+        }
+      } else {
+        // make sure to do a replace here to catch selectors like:
+        // `:host(.foo)::before`
+        return selector.replace(HOST_PAREN, function (m, host, paren) {
+          return hostScope + paren;
+        });
+      }
+      // if no paren, do a straight :host replacement.
+      // TODO(sorvell): this should not strictly be necessary but
+      // it's needed to maintain support for `:host[foo]` type selectors
+      // which have been improperly used under Shady DOM. This should be
+      // deprecated.
+    } else {
+      return selector.replace(HOST, hostScope);
+    }
+  }
+
+  /**
+   * @param {StyleNode} rule
+   */
+  documentRule(rule) {
+    // reset selector in case this is redone.
+    rule['selector'] = rule['parsedSelector'];
+    this.normalizeRootSelector(rule);
+    this._transformRule(rule, this._transformDocumentSelector);
+  }
+
+  /**
+   * @param {StyleNode} rule
+   */
+  normalizeRootSelector(rule) {
+    if (rule['selector'] === ROOT) {
+      rule['selector'] = 'html';
+    }
+  }
+
+  /**
+   * @param {string} selector
+   */
+  _transformDocumentSelector(selector) {
+    return selector.match(SLOTTED) ? this._transformComplexSelector(selector, SCOPE_DOC_SELECTOR) : this._transformSimpleSelector(selector.trim(), SCOPE_DOC_SELECTOR);
+  }
+}
+
+let NTH = /:(nth[-\w]+)\(([^)]+)\)/;
+let SCOPE_DOC_SELECTOR = `:not(.${SCOPE_NAME})`;
+let COMPLEX_SELECTOR_SEP = ',';
+let SIMPLE_SELECTOR_SEP = /(^|[\s>+~]+)((?:\[.+?\]|[^\s>+~=[])+)/g;
+let SIMPLE_SELECTOR_PREFIX = /[[.:#*]/;
+let HOST = ':host';
+let ROOT = ':root';
+let SLOTTED = '::slotted';
+let SLOTTED_START = new RegExp(`^(${SLOTTED})`);
+// NOTE: this supports 1 nested () pair for things like
+// :host(:not([selected]), more general support requires
+// parsing which seems like overkill
+let HOST_PAREN = /(:host)(?:\(((?:\([^)(]*\)|[^)(]*)+?)\))/;
+// similar to HOST_PAREN
+let SLOTTED_PAREN = /(?:::slotted)(?:\(((?:\([^)(]*\)|[^)(]*)+?)\))/;
+let DIR_PAREN = /(.*):dir\((?:(ltr|rtl))\)/;
+let CSS_CLASS_PREFIX = '.';
+let PSEUDO_PREFIX = ':';
+let CLASS = 'class';
+let SELECTOR_NO_MATCH = 'should_not_match';
+
+/* harmony default export */ __webpack_exports__["a"] = (new StyleTransformer());
+
+/***/ }),
+
+/***/ "../../node_modules/@webcomponents/shadycss/src/style-util.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (immutable) */ __webpack_exports__["d"] = toCssText;
+/* unused harmony export rulesForStyle */
+/* harmony export (immutable) */ __webpack_exports__["b"] = isKeyframesSelector;
+/* unused harmony export forEachRule */
+/* unused harmony export applyCss */
+/* unused harmony export createScopeStyle */
+/* unused harmony export applyStylePlaceHolder */
+/* unused harmony export applyStyle */
+/* unused harmony export isTargetedBuild */
+/* unused harmony export getCssBuildType */
+/* unused harmony export processVariableAndFallback */
+/* harmony export (immutable) */ __webpack_exports__["c"] = setElementClassRaw;
+/* harmony export (immutable) */ __webpack_exports__["a"] = getIsExtends;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__style_settings_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/style-settings.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__css_parse_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/css-parse.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__common_regex_js__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/common-regex.js");
+/**
+@license
+Copyright (c) 2017 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+
+
+
+ // eslint-disable-line no-unused-vars
+
+
+/**
+ * @param {string|StyleNode} rules
+ * @param {function(StyleNode)=} callback
+ * @return {string}
+ */
+function toCssText(rules, callback) {
+  if (!rules) {
+    return '';
+  }
+  if (typeof rules === 'string') {
+    rules = Object(__WEBPACK_IMPORTED_MODULE_1__css_parse_js__["a" /* parse */])(rules);
+  }
+  if (callback) {
+    forEachRule(rules, callback);
+  }
+  return Object(__WEBPACK_IMPORTED_MODULE_1__css_parse_js__["b" /* stringify */])(rules, __WEBPACK_IMPORTED_MODULE_0__style_settings_js__["a" /* nativeCssVariables */]);
+}
+
+/**
+ * @param {HTMLStyleElement} style
+ * @return {StyleNode}
+ */
+function rulesForStyle(style) {
+  if (!style['__cssRules'] && style.textContent) {
+    style['__cssRules'] = Object(__WEBPACK_IMPORTED_MODULE_1__css_parse_js__["a" /* parse */])(style.textContent);
+  }
+  return style['__cssRules'] || null;
+}
+
+// Tests if a rule is a keyframes selector, which looks almost exactly
+// like a normal selector but is not (it has nothing to do with scoping
+// for example).
+/**
+ * @param {StyleNode} rule
+ * @return {boolean}
+ */
+function isKeyframesSelector(rule) {
+  return Boolean(rule['parent']) && rule['parent']['type'] === __WEBPACK_IMPORTED_MODULE_1__css_parse_js__["c" /* types */].KEYFRAMES_RULE;
+}
+
+/**
+ * @param {StyleNode} node
+ * @param {Function=} styleRuleCallback
+ * @param {Function=} keyframesRuleCallback
+ * @param {boolean=} onlyActiveRules
+ */
+function forEachRule(node, styleRuleCallback, keyframesRuleCallback, onlyActiveRules) {
+  if (!node) {
+    return;
+  }
+  let skipRules = false;
+  let type = node['type'];
+  if (onlyActiveRules) {
+    if (type === __WEBPACK_IMPORTED_MODULE_1__css_parse_js__["c" /* types */].MEDIA_RULE) {
+      let matchMedia = node['selector'].match(__WEBPACK_IMPORTED_MODULE_2__common_regex_js__["a" /* MEDIA_MATCH */]);
+      if (matchMedia) {
+        // if rule is a non matching @media rule, skip subrules
+        if (!window.matchMedia(matchMedia[1]).matches) {
+          skipRules = true;
+        }
+      }
+    }
+  }
+  if (type === __WEBPACK_IMPORTED_MODULE_1__css_parse_js__["c" /* types */].STYLE_RULE) {
+    styleRuleCallback(node);
+  } else if (keyframesRuleCallback && type === __WEBPACK_IMPORTED_MODULE_1__css_parse_js__["c" /* types */].KEYFRAMES_RULE) {
+    keyframesRuleCallback(node);
+  } else if (type === __WEBPACK_IMPORTED_MODULE_1__css_parse_js__["c" /* types */].MIXIN_RULE) {
+    skipRules = true;
+  }
+  let r$ = node['rules'];
+  if (r$ && !skipRules) {
+    for (let i = 0, l = r$.length, r; i < l && (r = r$[i]); i++) {
+      forEachRule(r, styleRuleCallback, keyframesRuleCallback, onlyActiveRules);
+    }
+  }
+}
+
+// add a string of cssText to the document.
+/**
+ * @param {string} cssText
+ * @param {string} moniker
+ * @param {Node} target
+ * @param {Node} contextNode
+ * @return {HTMLStyleElement}
+ */
+function applyCss(cssText, moniker, target, contextNode) {
+  let style = createScopeStyle(cssText, moniker);
+  applyStyle(style, target, contextNode);
+  return style;
+}
+
+/**
+ * @param {string} cssText
+ * @param {string} moniker
+ * @return {HTMLStyleElement}
+ */
+function createScopeStyle(cssText, moniker) {
+  let style = /** @type {HTMLStyleElement} */document.createElement('style');
+  if (moniker) {
+    style.setAttribute('scope', moniker);
+  }
+  style.textContent = cssText;
+  return style;
+}
+
+/**
+ * Track the position of the last added style for placing placeholders
+ * @type {Node}
+ */
+let lastHeadApplyNode = null;
+
+// insert a comment node as a styling position placeholder.
+/**
+ * @param {string} moniker
+ * @return {!Comment}
+ */
+function applyStylePlaceHolder(moniker) {
+  let placeHolder = document.createComment(' Shady DOM styles for ' + moniker + ' ');
+  let after = lastHeadApplyNode ? lastHeadApplyNode['nextSibling'] : null;
+  let scope = document.head;
+  scope.insertBefore(placeHolder, after || scope.firstChild);
+  lastHeadApplyNode = placeHolder;
+  return placeHolder;
+}
+
+/**
+ * @param {HTMLStyleElement} style
+ * @param {?Node} target
+ * @param {?Node} contextNode
+ */
+function applyStyle(style, target, contextNode) {
+  target = target || document.head;
+  let after = contextNode && contextNode.nextSibling || target.firstChild;
+  target.insertBefore(style, after);
+  if (!lastHeadApplyNode) {
+    lastHeadApplyNode = style;
+  } else {
+    // only update lastHeadApplyNode if the new style is inserted after the old lastHeadApplyNode
+    let position = style.compareDocumentPosition(lastHeadApplyNode);
+    if (position === Node.DOCUMENT_POSITION_PRECEDING) {
+      lastHeadApplyNode = style;
+    }
+  }
+}
+
+/**
+ * @param {string} buildType
+ * @return {boolean}
+ */
+function isTargetedBuild(buildType) {
+  return __WEBPACK_IMPORTED_MODULE_0__style_settings_js__["b" /* nativeShadow */] ? buildType === 'shadow' : buildType === 'shady';
+}
+
+/**
+ * @param {Element} element
+ * @return {?string}
+ */
+function getCssBuildType(element) {
+  return element.getAttribute('css-build');
+}
+
+/**
+ * Walk from text[start] matching parens and
+ * returns position of the outer end paren
+ * @param {string} text
+ * @param {number} start
+ * @return {number}
+ */
+function findMatchingParen(text, start) {
+  let level = 0;
+  for (let i = start, l = text.length; i < l; i++) {
+    if (text[i] === '(') {
+      level++;
+    } else if (text[i] === ')') {
+      if (--level === 0) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * @param {string} str
+ * @param {function(string, string, string, string)} callback
+ */
+function processVariableAndFallback(str, callback) {
+  // find 'var('
+  let start = str.indexOf('var(');
+  if (start === -1) {
+    // no var?, everything is prefix
+    return callback(str, '', '', '');
+  }
+  //${prefix}var(${inner})${suffix}
+  let end = findMatchingParen(str, start + 3);
+  let inner = str.substring(start + 4, end);
+  let prefix = str.substring(0, start);
+  // suffix may have other variables
+  let suffix = processVariableAndFallback(str.substring(end + 1), callback);
+  let comma = inner.indexOf(',');
+  // value and fallback args should be trimmed to match in property lookup
+  if (comma === -1) {
+    // variable, no fallback
+    return callback(prefix, inner.trim(), '', suffix);
+  }
+  // var(${value},${fallback})
+  let value = inner.substring(0, comma).trim();
+  let fallback = inner.substring(comma + 1).trim();
+  return callback(prefix, value, fallback, suffix);
+}
+
+/**
+ * @param {Element} element
+ * @param {string} value
+ */
+function setElementClassRaw(element, value) {
+  // use native setAttribute provided by ShadyDOM when setAttribute is patched
+  if (__WEBPACK_IMPORTED_MODULE_0__style_settings_js__["b" /* nativeShadow */]) {
+    element.setAttribute('class', value);
+  } else {
+    window['ShadyDOM']['nativeMethods']['setAttribute'].call(element, 'class', value);
+  }
+}
+
+/**
+ * @param {Element | {is: string, extends: string}} element
+ * @return {{is: string, typeExtension: string}}
+ */
+function getIsExtends(element) {
+  let localName = element['localName'];
+  let is = '',
+      typeExtension = '';
+  /*
+  NOTE: technically, this can be wrong for certain svg elements
+  with `-` in the name like `<font-face>`
+  */
+  if (localName) {
+    if (localName.indexOf('-') > -1) {
+      is = localName;
+    } else {
+      typeExtension = localName;
+      is = element.getAttribute && element.getAttribute('is') || '';
+    }
+  } else {
+    is = /** @type {?} */element.is;
+    typeExtension = /** @type {?} */element.extends;
+  }
+  return { is, typeExtension };
+}
+
+/***/ }),
+
 /***/ "../../node_modules/kwak/lib/index.js":
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -758,10 +1762,10 @@ const isTrue = input => isEqualTo(true, input);
 /* unused harmony export isTrue */
 
 const isUndefined = input => isEqualTo(void 0, input);
-/* harmony export (immutable) */ __webpack_exports__["m"] = isUndefined;
+/* harmony export (immutable) */ __webpack_exports__["l"] = isUndefined;
 
 const isNull = input => isEqualTo(null, input);
-/* harmony export (immutable) */ __webpack_exports__["i"] = isNull;
+/* harmony export (immutable) */ __webpack_exports__["h"] = isNull;
 
 const isInstanceOf = (type, input) => input instanceof type;
 /* unused harmony export isInstanceOf */
@@ -773,10 +1777,10 @@ const isOfType = (type, input) => isEqualTo(type, typeof input);
 /* unused harmony export isOfType */
 
 const isObject = input => isOfType('object', input);
-/* harmony export (immutable) */ __webpack_exports__["j"] = isObject;
+/* harmony export (immutable) */ __webpack_exports__["i"] = isObject;
 
 const isPlainObject = __WEBPACK_IMPORTED_MODULE_1_lodash_isplainobject___default.a;
-/* harmony export (immutable) */ __webpack_exports__["k"] = isPlainObject;
+/* harmony export (immutable) */ __webpack_exports__["j"] = isPlainObject;
 
 const isEmpty = input => input.length < 1;
 /* harmony export (immutable) */ __webpack_exports__["e"] = isEmpty;
@@ -788,7 +1792,7 @@ const isString = input => {
 
   return isOfType('string', input);
 };
-/* harmony export (immutable) */ __webpack_exports__["l"] = isString;
+/* harmony export (immutable) */ __webpack_exports__["k"] = isString;
 
 const isFunction = input => isOfType('function', input) && input;
 /* harmony export (immutable) */ __webpack_exports__["g"] = isFunction;
@@ -797,7 +1801,7 @@ const isNumber = input => isOfType('number', input);
 /* unused harmony export isNumber */
 
 const isInteger = input => Number.isInteger(input);
-/* harmony export (immutable) */ __webpack_exports__["h"] = isInteger;
+/* unused harmony export isInteger */
 
 const isComponent = input => isObject(input) && input.isPwetComponent === true;
 /* unused harmony export isComponent */
@@ -5561,7 +6565,7 @@ const Component = (component = {}) => {
 
   const _getProperties = () => {
 
-    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["m" /* isUndefined */])(_properties), `Cannot get properties during creation`);
+    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["l" /* isUndefined */])(_properties), `Cannot get properties during creation`);
     Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(!component.isUpdating, `Cannot get properties during update`);
 
     return Object(__WEBPACK_IMPORTED_MODULE_2__utilities__["a" /* clone */])(_properties);
@@ -5589,7 +6593,7 @@ const Component = (component = {}) => {
 
       hooks.attach(component);
 
-      if (!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["i" /* isNull */])(_attributeObserver)) _attributeObserver.observe(element, { attributes: true, attributeOldValue: true });
+      if (!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["h" /* isNull */])(_attributeObserver)) _attributeObserver.observe(element, { attributes: true, attributeOldValue: true });
     };
 
     if (!component.isUpdating) return _attachComponent();
@@ -5601,7 +6605,7 @@ const Component = (component = {}) => {
 
     if (!_isAttached) return;
 
-    if (!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["i" /* isNull */])(_attributeObserver)) _attributeObserver.disconnect();
+    if (!Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["h" /* isNull */])(_attributeObserver)) _attributeObserver.disconnect();
 
     _isRendered = _isAttached = false;
 
@@ -5623,8 +6627,8 @@ const Component = (component = {}) => {
 
   component.update = (properties, options = {}) => {
 
-    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["j" /* isObject */])(properties), `'properties' must be an object`);
-    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["j" /* isObject */])(options), `'options' must be an object`);
+    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["i" /* isObject */])(properties), `'properties' must be an object`);
+    Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["i" /* isObject */])(options), `'options' must be an object`);
 
     const { partial = false } = options;
 
@@ -5660,7 +6664,7 @@ const Component = (component = {}) => {
 
     let property = properties[key](component);
 
-    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["m" /* isUndefined */])(property.configurable)) property.configurable = true;
+    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["l" /* isUndefined */])(property.configurable)) property.configurable = true;
 
     Object.defineProperty(element, key, {
       get: () => _properties[key],
@@ -5701,7 +6705,7 @@ const Component = (component = {}) => {
 
       const properties = attributesValues.reduce((before, result) => {
 
-        if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["k" /* isPlainObject */])(result)) {
+        if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["j" /* isPlainObject */])(result)) {
           mustUpdate = true;
           Object.assign(before, result);
         }
@@ -5726,8 +6730,8 @@ const Component = (component = {}) => {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return Definition; });
-/* unused harmony export $pwet */
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return Definition; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return $pwet; });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase__ = __webpack_require__("../../node_modules/lodash.kebabcase/index.js");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase__);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__utilities__ = __webpack_require__("../../src/utilities.js");
@@ -5794,7 +6798,7 @@ Definition.fromArray = definition => {
 
     const hooks = _extends({}, before.hooks);
 
-    if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isObject */])(after.hooks)) {
+    if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(after.hooks)) {
 
       const hooksOverride = {};
 
@@ -5814,7 +6818,7 @@ Definition.parseDefinition = (definition = {}) => {
 
   if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(definition)) {
 
-    if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["m" /* isUndefined */])(definition.tagName) && Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isString */])(definition.name)) definition.tagName = __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default()(definition.name);
+    if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isUndefined */])(definition.tagName) && Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(definition.name)) definition.tagName = __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default()(definition.name);
 
     definition = _extends({}, definition, {
       hooks: _extends({}, definition.hooks, {
@@ -5823,13 +6827,13 @@ Definition.parseDefinition = (definition = {}) => {
     });
   }
 
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isObject */])(definition), `'definition' must be an object`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(definition), `'definition' must be an object`);
 
   const { properties = {}, hooks = {}, attributes = {}, dependencies = {}, verbose } = definition;
   let { tagName, type = HTMLElement, style = '' } = definition;
 
   // Tag
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isString */])(tagName) && !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["e" /* isEmpty */])(tagName), `'tagName' must be a non empty string`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(tagName) && !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["e" /* isEmpty */])(tagName), `'tagName' must be a non empty string`);
   tagName = __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default()(tagName.toLowerCase());
   if (!tagName.includes('-')) tagName = `x-${tagName}`;
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(!Definition.getDefinition(tagName), `'${tagName}' definition already exists`);
@@ -5838,20 +6842,20 @@ Definition.parseDefinition = (definition = {}) => {
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(type) && (type === HTMLElement || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["d" /* isElement */])(type.prototype)), `'type' must be a subclass of HTMLElement`);
 
   // Properties
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isObject */])(properties), `'properties' must be an object`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(properties), `'properties' must be an object`);
   Object.keys(properties).forEach(key => {
     let property = properties[key];
 
     if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(property)) {
 
-      if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isPlainObject */])(property)) property = { value: property, writable: true };
+      if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isPlainObject */])(property)) property = { value: property, writable: true };
 
       properties[key] = () => property;
     }
   });
 
   // Attributes
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isObject */])(attributes), `'attributes' must be an object`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(attributes), `'attributes' must be an object`);
   Object.keys(attributes).forEach(key => {
     const attribute = attributes[key];
 
@@ -5859,10 +6863,10 @@ Definition.parseDefinition = (definition = {}) => {
   });
 
   // Style
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["m" /* isUndefined */])(style) || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isString */])(style), `'style' must be a string`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isUndefined */])(style) || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(style), `'style' must be a string`);
 
   // Hooks
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isObject */])(hooks), `'hooks' must be an object`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(hooks), `'hooks' must be an object`);
   Object.keys(Definition.defaultHooks).forEach(key => {
 
     const hook = hooks[key] || Definition.defaultHooks[key];
@@ -5888,10 +6892,10 @@ Definition.getDefinition = input => _definitions.find(definition => definition.t
 Definition.isDefinition = input => _definitions.includes(input);
 Definition.defaultHooks = {
   create: __WEBPACK_IMPORTED_MODULE_2__component__["a" /* default */],
-  attach: __WEBPACK_IMPORTED_MODULE_1__utilities__["c" /* noop */],
-  detach: __WEBPACK_IMPORTED_MODULE_1__utilities__["c" /* noop */],
-  render: __WEBPACK_IMPORTED_MODULE_1__utilities__["c" /* noop */],
-  define: __WEBPACK_IMPORTED_MODULE_1__utilities__["b" /* identity */],
+  attach: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
+  detach: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
+  render: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
+  define: __WEBPACK_IMPORTED_MODULE_1__utilities__["c" /* identity */],
   update: (component, properties, oldProperties) => {
 
     return !component.isRendered || !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["c" /* isDeeplyEqual */])(properties, oldProperties);
@@ -5899,6 +6903,60 @@ Definition.defaultHooks = {
 };
 
 
+
+/***/ }),
+
+/***/ "../../src/definitions/shadow.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadycss_src_style_transformer__ = __webpack_require__("../../node_modules/@webcomponents/shadycss/src/style-transformer.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__definition__ = __webpack_require__("../../src/definition.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__utilities__ = __webpack_require__("../../src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
+
+
+
+
+
+
+
+const isShadowNative = !(window['ShadyDOM'] && window['ShadyDOM']['inUse']);
+
+const ShadowComponent = component => {
+
+  const { element, definition: { verbose, tagName }, hooks } = component;
+
+  component.root = element.attachShadow({ mode: 'open' });
+
+  if (verbose) console.log('ShadowComponent()', hooks.render);
+
+  hooks.render = Object(__WEBPACK_IMPORTED_MODULE_2__utilities__["b" /* decorate */])(hooks.render, (next, component) => {
+
+    if (verbose) console.log('ShadowComponent.render()');
+
+    next(component);
+
+    if (!isShadowNative) __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadycss_src_style_transformer__["a" /* default */].dom(component.root, tagName);
+  });
+
+  return component;
+};
+
+ShadowComponent.hooks = {
+  define: definition => {
+
+    const { tagName, style, verbose } = definition;
+
+    if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["e" /* isEmpty */])(style) && !isShadowNative) definition.style = __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadycss_src_style_transformer__["a" /* default */].css(style, tagName);
+
+    if (verbose) console.log(`<${tagName}>`, 'ShadowComponent.define()');
+
+    return definition;
+  }
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (ShadowComponent);
 
 /***/ }),
 
@@ -5910,9 +6968,9 @@ Definition.defaultHooks = {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__definition__ = __webpack_require__("../../src/definition.js");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__component__ = __webpack_require__("../../src/component.js");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
-/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return __WEBPACK_IMPORTED_MODULE_1__component__["a"]; });
+/* unused harmony reexport Component */
 /* unused harmony reexport Definition */
-/* unused harmony reexport $pwet */
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return __WEBPACK_IMPORTED_MODULE_0__definition__["a"]; });
 
 
 var _arguments = arguments;
@@ -5928,16 +6986,16 @@ var _arguments = arguments;
  */
 const defineComponent = (definition, options = {}) => {
 
-  definition = Object(__WEBPACK_IMPORTED_MODULE_0__definition__["a" /* default */])(definition);
+  definition = Object(__WEBPACK_IMPORTED_MODULE_0__definition__["b" /* default */])(definition);
 
   let { tagName } = definition;
 
-  if (Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["l" /* isString */])(options)) {
+  if (Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["k" /* isString */])(options)) {
     tagName = options;
     options = _arguments.length > 2 ? _arguments[2] : null;
   }
 
-  Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["j" /* isObject */])(options), `'options' must be an object`);
+  Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["i" /* isObject */])(options), `'options' must be an object`);
 
   customElements.define(definition.tagName, definition.type, options);
 
@@ -5955,15 +7013,15 @@ const defineComponent = (definition, options = {}) => {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
 
 
-const clone = input => !Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["b" /* isArray */])(input) ? Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["j" /* isObject */])(input) && !Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["i" /* isNull */])(input) ? Object.assign({}, input) : input : input.map(clone);
+const clone = input => !Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["b" /* isArray */])(input) ? Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["i" /* isObject */])(input) && !Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["h" /* isNull */])(input) ? Object.assign({}, input) : input : input.map(clone);
 /* harmony export (immutable) */ __webpack_exports__["a"] = clone;
 
 
 const noop = () => {};
-/* harmony export (immutable) */ __webpack_exports__["c"] = noop;
+/* harmony export (immutable) */ __webpack_exports__["d"] = noop;
 
 const identity = arg => arg;
-/* harmony export (immutable) */ __webpack_exports__["b"] = identity;
+/* harmony export (immutable) */ __webpack_exports__["c"] = identity;
 
 const toggle = input => !input;
 /* unused harmony export toggle */
@@ -5983,7 +7041,7 @@ const decorate = (before, ...decorators) => {
 
   return decorators.reduce((before, fn) => fn.bind(null, before), before);
 };
-/* unused harmony export decorate */
+/* harmony export (immutable) */ __webpack_exports__["b"] = decorate;
 
 
 /***/ }),
@@ -11094,7 +12152,7 @@ function contains(container, node) {
 
 /***/ }),
 
-/***/ "./node_modules/css-loader/index.js!./src/components/counter/counter.css":
+/***/ "./node_modules/css-loader/index.js!./node_modules/stylus-loader/index.js!./src/components/todo-list/todo-list.styl":
 /***/ (function(module, exports, __webpack_require__) {
 
 exports = module.exports = __webpack_require__("./node_modules/css-loader/lib/css-base.js")(undefined);
@@ -11102,7 +12160,22 @@ exports = module.exports = __webpack_require__("./node_modules/css-loader/lib/cs
 
 
 // module
-exports.push([module.i, "x-counter {\n  background-color: green;\n}", ""]);
+exports.push([module.i, "x-todo-list > ul {\n  padding: 0;\n  margin: 42px auto;\n  max-width: 800px;\n}\n", ""]);
+
+// exports
+
+
+/***/ }),
+
+/***/ "./node_modules/css-loader/index.js!./node_modules/stylus-loader/index.js!./src/components/todo/todo.styl":
+/***/ (function(module, exports, __webpack_require__) {
+
+exports = module.exports = __webpack_require__("./node_modules/css-loader/lib/css-base.js")(undefined);
+// imports
+
+
+// module
+exports.push([module.i, ":host > li {\n  background-color: #f08080;\n  padding: 16px;\n  margin: 16px;\n  display: block;\n  cursor: pointer;\n}\n:host([completed]) > li {\n  background-color: #3cb371;\n  text-decoration: line-through;\n}\n", ""]);
 
 // exports
 
@@ -11189,6 +12262,3674 @@ function toComment(sourceMap) {
 
 /***/ }),
 
+/***/ "./node_modules/idom-util/src/anchor.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = ((href, key, staticProperties, ...args) => {
+  return Object(__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */])('a', key, staticProperties, 'href', href, ...args);
+});
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/button.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'button'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/div.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'div'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/element.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_incremental_dom__ = __webpack_require__("./node_modules/incremental-dom/dist/incremental-dom-cjs.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_incremental_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_incremental_dom__);
+
+
+/* harmony default export */ __webpack_exports__["a"] = ((tagName, ...args) => {
+
+  let renderContent;
+  if (args.length > 0 && typeof args[args.length - 1] === 'function') renderContent = args.pop();
+
+  Object(__WEBPACK_IMPORTED_MODULE_0_incremental_dom__["elementOpen"])(tagName, ...args);
+  renderContent && renderContent();
+  return Object(__WEBPACK_IMPORTED_MODULE_0_incremental_dom__["elementClose"])(tagName);
+});
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/footer.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'header'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/header.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'header'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/heading.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+const internal = {};
+
+internal.levels = [1, 2, 3, 4, 5, 6];
+
+internal.renderHeading = (level = 1, ...args) => {
+
+  level = parseInt(level);
+
+  if (!internal.levels.includes(level)) throw new Error('invalid heading level');
+
+  return Object(__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */])('h' + level, ...args);
+};
+
+/* unused harmony default export */ var _unused_webpack_default_export = (internal.renderHeading);
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/image.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_incremental_dom__ = __webpack_require__("./node_modules/incremental-dom/dist/incremental-dom-cjs.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_incremental_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_incremental_dom__);
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = ((src, ...args) => {
+
+  const key = args.shift();
+  const staticProperties = args.shift();
+
+  return Object(__WEBPACK_IMPORTED_MODULE_0_incremental_dom__["elementVoid"])('img', key, staticProperties, 'src', src, ...args);
+});
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "renderElement", function() { return __WEBPACK_IMPORTED_MODULE_0__element__["a"]; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__div__ = __webpack_require__("./node_modules/idom-util/src/div.js");
+/* unused harmony reexport renderDiv */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__span__ = __webpack_require__("./node_modules/idom-util/src/span.js");
+/* unused harmony reexport renderSpan */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__button__ = __webpack_require__("./node_modules/idom-util/src/button.js");
+/* unused harmony reexport renderButton */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__image__ = __webpack_require__("./node_modules/idom-util/src/image.js");
+/* unused harmony reexport renderImage */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__li__ = __webpack_require__("./node_modules/idom-util/src/li.js");
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "renderLi", function() { return __WEBPACK_IMPORTED_MODULE_5__li__["a"]; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__ul__ = __webpack_require__("./node_modules/idom-util/src/ul.js");
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "renderUl", function() { return __WEBPACK_IMPORTED_MODULE_6__ul__["a"]; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__nav__ = __webpack_require__("./node_modules/idom-util/src/nav.js");
+/* unused harmony reexport renderNav */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__section__ = __webpack_require__("./node_modules/idom-util/src/section.js");
+/* unused harmony reexport renderSection */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__style__ = __webpack_require__("./node_modules/idom-util/src/style.js");
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "renderStyle", function() { return __WEBPACK_IMPORTED_MODULE_9__style__["a"]; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__strong__ = __webpack_require__("./node_modules/idom-util/src/strong.js");
+/* unused harmony reexport renderStrong */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__label__ = __webpack_require__("./node_modules/idom-util/src/label.js");
+/* unused harmony reexport renderLabel */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__input__ = __webpack_require__("./node_modules/idom-util/src/input.js");
+/* unused harmony reexport renderInput */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_13__pre__ = __webpack_require__("./node_modules/idom-util/src/pre.js");
+/* unused harmony reexport renderPre */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_14__heading__ = __webpack_require__("./node_modules/idom-util/src/heading.js");
+/* unused harmony reexport renderHeading */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15__header__ = __webpack_require__("./node_modules/idom-util/src/header.js");
+/* unused harmony reexport renderHeader */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16__footer__ = __webpack_require__("./node_modules/idom-util/src/footer.js");
+/* unused harmony reexport renderFooter */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_17__anchor__ = __webpack_require__("./node_modules/idom-util/src/anchor.js");
+/* unused harmony reexport renderAnchor */
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18_incremental_dom__ = __webpack_require__("./node_modules/incremental-dom/dist/incremental-dom-cjs.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18_incremental_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_18_incremental_dom__);
+/* harmony namespace reexport (by used) */ if(__webpack_require__.o(__WEBPACK_IMPORTED_MODULE_18_incremental_dom__, "patch")) __webpack_require__.d(__webpack_exports__, "patch", function() { return __WEBPACK_IMPORTED_MODULE_18_incremental_dom__["patch"]; });
+/* harmony namespace reexport (by used) */ if(__webpack_require__.o(__WEBPACK_IMPORTED_MODULE_18_incremental_dom__, "skip")) __webpack_require__.d(__webpack_exports__, "skip", function() { return __WEBPACK_IMPORTED_MODULE_18_incremental_dom__["skip"]; });
+/* harmony namespace reexport (by used) */ if(__webpack_require__.o(__WEBPACK_IMPORTED_MODULE_18_incremental_dom__, "text")) __webpack_require__.d(__webpack_exports__, "text", function() { return __WEBPACK_IMPORTED_MODULE_18_incremental_dom__["text"]; });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const transformObjectToArray = object => Object.keys(object).reduce((before, key) => before.concat([key, object[key]]), []);
+/* harmony export (immutable) */ __webpack_exports__["transformObjectToArray"] = transformObjectToArray;
+
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/input.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'input'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/label.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'label'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/li.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* harmony default export */ __webpack_exports__["a"] = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'li'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/nav.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'nav'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/pre.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'pre'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/section.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'section'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/span.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'span'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/strong.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'strong'));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/style.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_incremental_dom__ = __webpack_require__("./node_modules/incremental-dom/dist/incremental-dom-cjs.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_incremental_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_incremental_dom__);
+
+
+
+/* harmony default export */ __webpack_exports__["a"] = ((style, ...args) => Object(__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */])('style', ...args, __WEBPACK_IMPORTED_MODULE_1_incremental_dom__["text"].bind(null, style || '')));
+
+/***/ }),
+
+/***/ "./node_modules/idom-util/src/ul.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__element__ = __webpack_require__("./node_modules/idom-util/src/element.js");
+
+
+/* harmony default export */ __webpack_exports__["a"] = (__WEBPACK_IMPORTED_MODULE_0__element__["a" /* default */].bind(null, 'ul'));
+
+/***/ }),
+
+/***/ "./node_modules/incremental-dom/dist/incremental-dom-cjs.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {
+/**
+ * @license
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * A cached reference to the hasOwnProperty function.
+ */
+
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+
+/**
+ * A constructor function that will create blank objects.
+ * @constructor
+ */
+function Blank() {}
+
+Blank.prototype = Object.create(null);
+
+/**
+ * Used to prevent property collisions between our "map" and its prototype.
+ * @param {!Object<string, *>} map The map to check.
+ * @param {string} property The property to check.
+ * @return {boolean} Whether map has property.
+ */
+var has = function (map, property) {
+  return hasOwnProperty.call(map, property);
+};
+
+/**
+ * Creates an map object without a prototype.
+ * @return {!Object}
+ */
+var createMap = function () {
+  return new Blank();
+};
+
+/**
+ * Keeps track of information needed to perform diffs for a given DOM node.
+ * @param {!string} nodeName
+ * @param {?string=} key
+ * @constructor
+ */
+function NodeData(nodeName, key) {
+  /**
+   * The attributes and their values.
+   * @const {!Object<string, *>}
+   */
+  this.attrs = createMap();
+
+  /**
+   * An array of attribute name/value pairs, used for quickly diffing the
+   * incomming attributes to see if the DOM node's attributes need to be
+   * updated.
+   * @const {Array<*>}
+   */
+  this.attrsArr = [];
+
+  /**
+   * The incoming attributes for this Node, before they are updated.
+   * @const {!Object<string, *>}
+   */
+  this.newAttrs = createMap();
+
+  /**
+   * Whether or not the statics have been applied for the node yet.
+   * {boolean}
+   */
+  this.staticsApplied = false;
+
+  /**
+   * The key used to identify this node, used to preserve DOM nodes when they
+   * move within their parent.
+   * @const
+   */
+  this.key = key;
+
+  /**
+   * Keeps track of children within this node by their key.
+   * {!Object<string, !Element>}
+   */
+  this.keyMap = createMap();
+
+  /**
+   * Whether or not the keyMap is currently valid.
+   * @type {boolean}
+   */
+  this.keyMapValid = true;
+
+  /**
+   * Whether or the associated node is, or contains, a focused Element.
+   * @type {boolean}
+   */
+  this.focused = false;
+
+  /**
+   * The node name for this node.
+   * @const {string}
+   */
+  this.nodeName = nodeName;
+
+  /**
+   * @type {?string}
+   */
+  this.text = null;
+}
+
+/**
+ * Initializes a NodeData object for a Node.
+ *
+ * @param {Node} node The node to initialize data for.
+ * @param {string} nodeName The node name of node.
+ * @param {?string=} key The key that identifies the node.
+ * @return {!NodeData} The newly initialized data object
+ */
+var initData = function (node, nodeName, key) {
+  var data = new NodeData(nodeName, key);
+  node['__incrementalDOMData'] = data;
+  return data;
+};
+
+/**
+ * Retrieves the NodeData object for a Node, creating it if necessary.
+ *
+ * @param {?Node} node The Node to retrieve the data for.
+ * @return {!NodeData} The NodeData for this Node.
+ */
+var getData = function (node) {
+  importNode(node);
+  return node['__incrementalDOMData'];
+};
+
+/**
+ * Imports node and its subtree, initializing caches.
+ *
+ * @param {?Node} node The Node to import.
+ */
+var importNode = function (node) {
+  if (node['__incrementalDOMData']) {
+    return;
+  }
+
+  var isElement = node instanceof Element;
+  var nodeName = isElement ? node.localName : node.nodeName;
+  var key = isElement ? node.getAttribute('key') : null;
+  var data = initData(node, nodeName, key);
+
+  if (key) {
+    getData(node.parentNode).keyMap[key] = node;
+  }
+
+  if (isElement) {
+    var attributes = node.attributes;
+    var attrs = data.attrs;
+    var newAttrs = data.newAttrs;
+    var attrsArr = data.attrsArr;
+
+    for (var i = 0; i < attributes.length; i += 1) {
+      var attr = attributes[i];
+      var name = attr.name;
+      var value = attr.value;
+
+      attrs[name] = value;
+      newAttrs[name] = undefined;
+      attrsArr.push(name);
+      attrsArr.push(value);
+    }
+  }
+
+  for (var child = node.firstChild; child; child = child.nextSibling) {
+    importNode(child);
+  }
+};
+
+/**
+ * Gets the namespace to create an element (of a given tag) in.
+ * @param {string} tag The tag to get the namespace for.
+ * @param {?Node} parent
+ * @return {?string} The namespace to create the tag in.
+ */
+var getNamespaceForTag = function (tag, parent) {
+  if (tag === 'svg') {
+    return 'http://www.w3.org/2000/svg';
+  }
+
+  if (getData(parent).nodeName === 'foreignObject') {
+    return null;
+  }
+
+  return parent.namespaceURI;
+};
+
+/**
+ * Creates an Element.
+ * @param {Document} doc The document with which to create the Element.
+ * @param {?Node} parent
+ * @param {string} tag The tag for the Element.
+ * @param {?string=} key A key to identify the Element.
+ * @return {!Element}
+ */
+var createElement = function (doc, parent, tag, key) {
+  var namespace = getNamespaceForTag(tag, parent);
+  var el = undefined;
+
+  if (namespace) {
+    el = doc.createElementNS(namespace, tag);
+  } else {
+    el = doc.createElement(tag);
+  }
+
+  initData(el, tag, key);
+
+  return el;
+};
+
+/**
+ * Creates a Text Node.
+ * @param {Document} doc The document with which to create the Element.
+ * @return {!Text}
+ */
+var createText = function (doc) {
+  var node = doc.createTextNode('');
+  initData(node, '#text', null);
+  return node;
+};
+
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/** @const */
+var notifications = {
+  /**
+   * Called after patch has compleated with any Nodes that have been created
+   * and added to the DOM.
+   * @type {?function(Array<!Node>)}
+   */
+  nodesCreated: null,
+
+  /**
+   * Called after patch has compleated with any Nodes that have been removed
+   * from the DOM.
+   * Note it's an applications responsibility to handle any childNodes.
+   * @type {?function(Array<!Node>)}
+   */
+  nodesDeleted: null
+};
+
+/**
+ * Keeps track of the state of a patch.
+ * @constructor
+ */
+function Context() {
+  /**
+   * @type {(Array<!Node>|undefined)}
+   */
+  this.created = notifications.nodesCreated && [];
+
+  /**
+   * @type {(Array<!Node>|undefined)}
+   */
+  this.deleted = notifications.nodesDeleted && [];
+}
+
+/**
+ * @param {!Node} node
+ */
+Context.prototype.markCreated = function (node) {
+  if (this.created) {
+    this.created.push(node);
+  }
+};
+
+/**
+ * @param {!Node} node
+ */
+Context.prototype.markDeleted = function (node) {
+  if (this.deleted) {
+    this.deleted.push(node);
+  }
+};
+
+/**
+ * Notifies about nodes that were created during the patch opearation.
+ */
+Context.prototype.notifyChanges = function () {
+  if (this.created && this.created.length > 0) {
+    notifications.nodesCreated(this.created);
+  }
+
+  if (this.deleted && this.deleted.length > 0) {
+    notifications.nodesDeleted(this.deleted);
+  }
+};
+
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+  * Keeps track whether or not we are in an attributes declaration (after
+  * elementOpenStart, but before elementOpenEnd).
+  * @type {boolean}
+  */
+var inAttributes = false;
+
+/**
+  * Keeps track whether or not we are in an element that should not have its
+  * children cleared.
+  * @type {boolean}
+  */
+var inSkip = false;
+
+/**
+ * Makes sure that there is a current patch context.
+ * @param {string} functionName
+ * @param {*} context
+ */
+var assertInPatch = function (functionName, context) {
+  if (!context) {
+    throw new Error('Cannot call ' + functionName + '() unless in patch.');
+  }
+};
+
+/**
+ * Makes sure that a patch closes every node that it opened.
+ * @param {?Node} openElement
+ * @param {!Node|!DocumentFragment} root
+ */
+var assertNoUnclosedTags = function (openElement, root) {
+  if (openElement === root) {
+    return;
+  }
+
+  var currentElement = openElement;
+  var openTags = [];
+  while (currentElement && currentElement !== root) {
+    openTags.push(currentElement.nodeName.toLowerCase());
+    currentElement = currentElement.parentNode;
+  }
+
+  throw new Error('One or more tags were not closed:\n' + openTags.join('\n'));
+};
+
+/**
+ * Makes sure that the caller is not where attributes are expected.
+ * @param {string} functionName
+ */
+var assertNotInAttributes = function (functionName) {
+  if (inAttributes) {
+    throw new Error(functionName + '() can not be called between ' + 'elementOpenStart() and elementOpenEnd().');
+  }
+};
+
+/**
+ * Makes sure that the caller is not inside an element that has declared skip.
+ * @param {string} functionName
+ */
+var assertNotInSkip = function (functionName) {
+  if (inSkip) {
+    throw new Error(functionName + '() may not be called inside an element ' + 'that has called skip().');
+  }
+};
+
+/**
+ * Makes sure that the caller is where attributes are expected.
+ * @param {string} functionName
+ */
+var assertInAttributes = function (functionName) {
+  if (!inAttributes) {
+    throw new Error(functionName + '() can only be called after calling ' + 'elementOpenStart().');
+  }
+};
+
+/**
+ * Makes sure the patch closes virtual attributes call
+ */
+var assertVirtualAttributesClosed = function () {
+  if (inAttributes) {
+    throw new Error('elementOpenEnd() must be called after calling ' + 'elementOpenStart().');
+  }
+};
+
+/**
+  * Makes sure that tags are correctly nested.
+  * @param {string} nodeName
+  * @param {string} tag
+  */
+var assertCloseMatchesOpenTag = function (nodeName, tag) {
+  if (nodeName !== tag) {
+    throw new Error('Received a call to close "' + tag + '" but "' + nodeName + '" was open.');
+  }
+};
+
+/**
+ * Makes sure that no children elements have been declared yet in the current
+ * element.
+ * @param {string} functionName
+ * @param {?Node} previousNode
+ */
+var assertNoChildrenDeclaredYet = function (functionName, previousNode) {
+  if (previousNode !== null) {
+    throw new Error(functionName + '() must come before any child ' + 'declarations inside the current element.');
+  }
+};
+
+/**
+ * Checks that a call to patchOuter actually patched the element.
+ * @param {?Node} startNode The value for the currentNode when the patch
+ *     started.
+ * @param {?Node} currentNode The currentNode when the patch finished.
+ * @param {?Node} expectedNextNode The Node that is expected to follow the
+ *    currentNode after the patch;
+ * @param {?Node} expectedPrevNode The Node that is expected to preceed the
+ *    currentNode after the patch.
+ */
+var assertPatchElementNoExtras = function (startNode, currentNode, expectedNextNode, expectedPrevNode) {
+  var wasUpdated = currentNode.nextSibling === expectedNextNode && currentNode.previousSibling === expectedPrevNode;
+  var wasChanged = currentNode.nextSibling === startNode.nextSibling && currentNode.previousSibling === expectedPrevNode;
+  var wasRemoved = currentNode === startNode;
+
+  if (!wasUpdated && !wasChanged && !wasRemoved) {
+    throw new Error('There must be exactly one top level call corresponding ' + 'to the patched element.');
+  }
+};
+
+/**
+ * Updates the state of being in an attribute declaration.
+ * @param {boolean} value
+ * @return {boolean} the previous value.
+ */
+var setInAttributes = function (value) {
+  var previous = inAttributes;
+  inAttributes = value;
+  return previous;
+};
+
+/**
+ * Updates the state of being in a skip element.
+ * @param {boolean} value
+ * @return {boolean} the previous value.
+ */
+var setInSkip = function (value) {
+  var previous = inSkip;
+  inSkip = value;
+  return previous;
+};
+
+/**
+ * Copyright 2016 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * @param {!Node} node
+ * @return {boolean} True if the node the root of a document, false otherwise.
+ */
+var isDocumentRoot = function (node) {
+  // For ShadowRoots, check if they are a DocumentFragment instead of if they
+  // are a ShadowRoot so that this can work in 'use strict' if ShadowRoots are
+  // not supported.
+  return node instanceof Document || node instanceof DocumentFragment;
+};
+
+/**
+ * @param {!Node} node The node to start at, inclusive.
+ * @param {?Node} root The root ancestor to get until, exclusive.
+ * @return {!Array<!Node>} The ancestry of DOM nodes.
+ */
+var getAncestry = function (node, root) {
+  var ancestry = [];
+  var cur = node;
+
+  while (cur !== root) {
+    ancestry.push(cur);
+    cur = cur.parentNode;
+  }
+
+  return ancestry;
+};
+
+/**
+ * @param {!Node} node
+ * @return {!Node} The root node of the DOM tree that contains node.
+ */
+var getRoot = function (node) {
+  var cur = node;
+  var prev = cur;
+
+  while (cur) {
+    prev = cur;
+    cur = cur.parentNode;
+  }
+
+  return prev;
+};
+
+/**
+ * @param {!Node} node The node to get the activeElement for.
+ * @return {?Element} The activeElement in the Document or ShadowRoot
+ *     corresponding to node, if present.
+ */
+var getActiveElement = function (node) {
+  var root = getRoot(node);
+  return isDocumentRoot(root) ? root.activeElement : null;
+};
+
+/**
+ * Gets the path of nodes that contain the focused node in the same document as
+ * a reference node, up until the root.
+ * @param {!Node} node The reference node to get the activeElement for.
+ * @param {?Node} root The root to get the focused path until.
+ * @return {!Array<Node>}
+ */
+var getFocusedPath = function (node, root) {
+  var activeElement = getActiveElement(node);
+
+  if (!activeElement || !node.contains(activeElement)) {
+    return [];
+  }
+
+  return getAncestry(activeElement, root);
+};
+
+/**
+ * Like insertBefore, but instead instead of moving the desired node, instead
+ * moves all the other nodes after.
+ * @param {?Node} parentNode
+ * @param {!Node} node
+ * @param {?Node} referenceNode
+ */
+var moveBefore = function (parentNode, node, referenceNode) {
+  var insertReferenceNode = node.nextSibling;
+  var cur = referenceNode;
+
+  while (cur !== node) {
+    var next = cur.nextSibling;
+    parentNode.insertBefore(cur, insertReferenceNode);
+    cur = next;
+  }
+};
+
+/** @type {?Context} */
+var context = null;
+
+/** @type {?Node} */
+var currentNode = null;
+
+/** @type {?Node} */
+var currentParent = null;
+
+/** @type {?Document} */
+var doc = null;
+
+/**
+ * @param {!Array<Node>} focusPath The nodes to mark.
+ * @param {boolean} focused Whether or not they are focused.
+ */
+var markFocused = function (focusPath, focused) {
+  for (var i = 0; i < focusPath.length; i += 1) {
+    getData(focusPath[i]).focused = focused;
+  }
+};
+
+/**
+ * Returns a patcher function that sets up and restores a patch context,
+ * running the run function with the provided data.
+ * @param {function((!Element|!DocumentFragment),!function(T),T=): ?Node} run
+ * @return {function((!Element|!DocumentFragment),!function(T),T=): ?Node}
+ * @template T
+ */
+var patchFactory = function (run) {
+  /**
+   * TODO(moz): These annotations won't be necessary once we switch to Closure
+   * Compiler's new type inference. Remove these once the switch is done.
+   *
+   * @param {(!Element|!DocumentFragment)} node
+   * @param {!function(T)} fn
+   * @param {T=} data
+   * @return {?Node} node
+   * @template T
+   */
+  var f = function (node, fn, data) {
+    var prevContext = context;
+    var prevDoc = doc;
+    var prevCurrentNode = currentNode;
+    var prevCurrentParent = currentParent;
+    var previousInAttributes = false;
+    var previousInSkip = false;
+
+    context = new Context();
+    doc = node.ownerDocument;
+    currentParent = node.parentNode;
+
+    if (process.env.NODE_ENV !== 'production') {
+      previousInAttributes = setInAttributes(false);
+      previousInSkip = setInSkip(false);
+    }
+
+    var focusPath = getFocusedPath(node, currentParent);
+    markFocused(focusPath, true);
+    var retVal = run(node, fn, data);
+    markFocused(focusPath, false);
+
+    if (process.env.NODE_ENV !== 'production') {
+      assertVirtualAttributesClosed();
+      setInAttributes(previousInAttributes);
+      setInSkip(previousInSkip);
+    }
+
+    context.notifyChanges();
+
+    context = prevContext;
+    doc = prevDoc;
+    currentNode = prevCurrentNode;
+    currentParent = prevCurrentParent;
+
+    return retVal;
+  };
+  return f;
+};
+
+/**
+ * Patches the document starting at node with the provided function. This
+ * function may be called during an existing patch operation.
+ * @param {!Element|!DocumentFragment} node The Element or Document
+ *     to patch.
+ * @param {!function(T)} fn A function containing elementOpen/elementClose/etc.
+ *     calls that describe the DOM.
+ * @param {T=} data An argument passed to fn to represent DOM state.
+ * @return {!Node} The patched node.
+ * @template T
+ */
+var patchInner = patchFactory(function (node, fn, data) {
+  currentNode = node;
+
+  enterNode();
+  fn(data);
+  exitNode();
+
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoUnclosedTags(currentNode, node);
+  }
+
+  return node;
+});
+
+/**
+ * Patches an Element with the the provided function. Exactly one top level
+ * element call should be made corresponding to `node`.
+ * @param {!Element} node The Element where the patch should start.
+ * @param {!function(T)} fn A function containing elementOpen/elementClose/etc.
+ *     calls that describe the DOM. This should have at most one top level
+ *     element call.
+ * @param {T=} data An argument passed to fn to represent DOM state.
+ * @return {?Node} The node if it was updated, its replacedment or null if it
+ *     was removed.
+ * @template T
+ */
+var patchOuter = patchFactory(function (node, fn, data) {
+  var startNode = /** @type {!Element} */{ nextSibling: node };
+  var expectedNextNode = null;
+  var expectedPrevNode = null;
+
+  if (process.env.NODE_ENV !== 'production') {
+    expectedNextNode = node.nextSibling;
+    expectedPrevNode = node.previousSibling;
+  }
+
+  currentNode = startNode;
+  fn(data);
+
+  if (process.env.NODE_ENV !== 'production') {
+    assertPatchElementNoExtras(startNode, currentNode, expectedNextNode, expectedPrevNode);
+  }
+
+  if (node !== currentNode && node.parentNode) {
+    removeChild(currentParent, node, getData(currentParent).keyMap);
+  }
+
+  return startNode === currentNode ? null : currentNode;
+});
+
+/**
+ * Checks whether or not the current node matches the specified nodeName and
+ * key.
+ *
+ * @param {!Node} matchNode A node to match the data to.
+ * @param {?string} nodeName The nodeName for this node.
+ * @param {?string=} key An optional key that identifies a node.
+ * @return {boolean} True if the node matches, false otherwise.
+ */
+var matches = function (matchNode, nodeName, key) {
+  var data = getData(matchNode);
+
+  // Key check is done using double equals as we want to treat a null key the
+  // same as undefined. This should be okay as the only values allowed are
+  // strings, null and undefined so the == semantics are not too weird.
+  return nodeName === data.nodeName && key == data.key;
+};
+
+/**
+ * Aligns the virtual Element definition with the actual DOM, moving the
+ * corresponding DOM node to the correct location or creating it if necessary.
+ * @param {string} nodeName For an Element, this should be a valid tag string.
+ *     For a Text, this should be #text.
+ * @param {?string=} key The key used to identify this element.
+ */
+var alignWithDOM = function (nodeName, key) {
+  if (currentNode && matches(currentNode, nodeName, key)) {
+    return;
+  }
+
+  var parentData = getData(currentParent);
+  var currentNodeData = currentNode && getData(currentNode);
+  var keyMap = parentData.keyMap;
+  var node = undefined;
+
+  // Check to see if the node has moved within the parent.
+  if (key) {
+    var keyNode = keyMap[key];
+    if (keyNode) {
+      if (matches(keyNode, nodeName, key)) {
+        node = keyNode;
+      } else if (keyNode === currentNode) {
+        context.markDeleted(keyNode);
+      } else {
+        removeChild(currentParent, keyNode, keyMap);
+      }
+    }
+  }
+
+  // Create the node if it doesn't exist.
+  if (!node) {
+    if (nodeName === '#text') {
+      node = createText(doc);
+    } else {
+      node = createElement(doc, currentParent, nodeName, key);
+    }
+
+    if (key) {
+      keyMap[key] = node;
+    }
+
+    context.markCreated(node);
+  }
+
+  // Re-order the node into the right position, preserving focus if either
+  // node or currentNode are focused by making sure that they are not detached
+  // from the DOM.
+  if (getData(node).focused) {
+    // Move everything else before the node.
+    moveBefore(currentParent, node, currentNode);
+  } else if (currentNodeData && currentNodeData.key && !currentNodeData.focused) {
+    // Remove the currentNode, which can always be added back since we hold a
+    // reference through the keyMap. This prevents a large number of moves when
+    // a keyed item is removed or moved backwards in the DOM.
+    currentParent.replaceChild(node, currentNode);
+    parentData.keyMapValid = false;
+  } else {
+    currentParent.insertBefore(node, currentNode);
+  }
+
+  currentNode = node;
+};
+
+/**
+ * @param {?Node} node
+ * @param {?Node} child
+ * @param {?Object<string, !Element>} keyMap
+ */
+var removeChild = function (node, child, keyMap) {
+  node.removeChild(child);
+  context.markDeleted( /** @type {!Node}*/child);
+
+  var key = getData(child).key;
+  if (key) {
+    delete keyMap[key];
+  }
+};
+
+/**
+ * Clears out any unvisited Nodes, as the corresponding virtual element
+ * functions were never called for them.
+ */
+var clearUnvisitedDOM = function () {
+  var node = currentParent;
+  var data = getData(node);
+  var keyMap = data.keyMap;
+  var keyMapValid = data.keyMapValid;
+  var child = node.lastChild;
+  var key = undefined;
+
+  if (child === currentNode && keyMapValid) {
+    return;
+  }
+
+  while (child !== currentNode) {
+    removeChild(node, child, keyMap);
+    child = node.lastChild;
+  }
+
+  // Clean the keyMap, removing any unusued keys.
+  if (!keyMapValid) {
+    for (key in keyMap) {
+      child = keyMap[key];
+      if (child.parentNode !== node) {
+        context.markDeleted(child);
+        delete keyMap[key];
+      }
+    }
+
+    data.keyMapValid = true;
+  }
+};
+
+/**
+ * Changes to the first child of the current node.
+ */
+var enterNode = function () {
+  currentParent = currentNode;
+  currentNode = null;
+};
+
+/**
+ * @return {?Node} The next Node to be patched.
+ */
+var getNextNode = function () {
+  if (currentNode) {
+    return currentNode.nextSibling;
+  } else {
+    return currentParent.firstChild;
+  }
+};
+
+/**
+ * Changes to the next sibling of the current node.
+ */
+var nextNode = function () {
+  currentNode = getNextNode();
+};
+
+/**
+ * Changes to the parent of the current node, removing any unvisited children.
+ */
+var exitNode = function () {
+  clearUnvisitedDOM();
+
+  currentNode = currentParent;
+  currentParent = currentParent.parentNode;
+};
+
+/**
+ * Makes sure that the current node is an Element with a matching tagName and
+ * key.
+ *
+ * @param {string} tag The element's tag.
+ * @param {?string=} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @return {!Element} The corresponding Element.
+ */
+var coreElementOpen = function (tag, key) {
+  nextNode();
+  alignWithDOM(tag, key);
+  enterNode();
+  return (/** @type {!Element} */currentParent
+  );
+};
+
+/**
+ * Closes the currently open Element, removing any unvisited children if
+ * necessary.
+ *
+ * @return {!Element} The corresponding Element.
+ */
+var coreElementClose = function () {
+  if (process.env.NODE_ENV !== 'production') {
+    setInSkip(false);
+  }
+
+  exitNode();
+  return (/** @type {!Element} */currentNode
+  );
+};
+
+/**
+ * Makes sure the current node is a Text node and creates a Text node if it is
+ * not.
+ *
+ * @return {!Text} The corresponding Text Node.
+ */
+var coreText = function () {
+  nextNode();
+  alignWithDOM('#text', null);
+  return (/** @type {!Text} */currentNode
+  );
+};
+
+/**
+ * Gets the current Element being patched.
+ * @return {!Element}
+ */
+var currentElement = function () {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInPatch('currentElement', context);
+    assertNotInAttributes('currentElement');
+  }
+  return (/** @type {!Element} */currentParent
+  );
+};
+
+/**
+ * @return {Node} The Node that will be evaluated for the next instruction.
+ */
+var currentPointer = function () {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInPatch('currentPointer', context);
+    assertNotInAttributes('currentPointer');
+  }
+  return getNextNode();
+};
+
+/**
+ * Skips the children in a subtree, allowing an Element to be closed without
+ * clearing out the children.
+ */
+var skip = function () {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNoChildrenDeclaredYet('skip', currentNode);
+    setInSkip(true);
+  }
+  currentNode = currentParent.lastChild;
+};
+
+/**
+ * Skips the next Node to be patched, moving the pointer forward to the next
+ * sibling of the current pointer.
+ */
+var skipNode = nextNode;
+
+/**
+ * Copyright 2015 The Incremental DOM Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS-IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/** @const */
+var symbols = {
+  default: '__default'
+};
+
+/**
+ * @param {string} name
+ * @return {string|undefined} The namespace to use for the attribute.
+ */
+var getNamespace = function (name) {
+  if (name.lastIndexOf('xml:', 0) === 0) {
+    return 'http://www.w3.org/XML/1998/namespace';
+  }
+
+  if (name.lastIndexOf('xlink:', 0) === 0) {
+    return 'http://www.w3.org/1999/xlink';
+  }
+};
+
+/**
+ * Applies an attribute or property to a given Element. If the value is null
+ * or undefined, it is removed from the Element. Otherwise, the value is set
+ * as an attribute.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {?(boolean|number|string)=} value The attribute's value.
+ */
+var applyAttr = function (el, name, value) {
+  if (value == null) {
+    el.removeAttribute(name);
+  } else {
+    var attrNS = getNamespace(name);
+    if (attrNS) {
+      el.setAttributeNS(attrNS, name, value);
+    } else {
+      el.setAttribute(name, value);
+    }
+  }
+};
+
+/**
+ * Applies a property to a given Element.
+ * @param {!Element} el
+ * @param {string} name The property's name.
+ * @param {*} value The property's value.
+ */
+var applyProp = function (el, name, value) {
+  el[name] = value;
+};
+
+/**
+ * Applies a value to a style declaration. Supports CSS custom properties by
+ * setting properties containing a dash using CSSStyleDeclaration.setProperty.
+ * @param {CSSStyleDeclaration} style
+ * @param {!string} prop
+ * @param {*} value
+ */
+var setStyleValue = function (style, prop, value) {
+  if (prop.indexOf('-') >= 0) {
+    style.setProperty(prop, /** @type {string} */value);
+  } else {
+    style[prop] = value;
+  }
+};
+
+/**
+ * Applies a style to an Element. No vendor prefix expansion is done for
+ * property names/values.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {*} style The style to set. Either a string of css or an object
+ *     containing property-value pairs.
+ */
+var applyStyle = function (el, name, style) {
+  if (typeof style === 'string') {
+    el.style.cssText = style;
+  } else {
+    el.style.cssText = '';
+    var elStyle = el.style;
+    var obj = /** @type {!Object<string,string>} */style;
+
+    for (var prop in obj) {
+      if (has(obj, prop)) {
+        setStyleValue(elStyle, prop, obj[prop]);
+      }
+    }
+  }
+};
+
+/**
+ * Updates a single attribute on an Element.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {*} value The attribute's value. If the value is an object or
+ *     function it is set on the Element, otherwise, it is set as an HTML
+ *     attribute.
+ */
+var applyAttributeTyped = function (el, name, value) {
+  var type = typeof value;
+
+  if (type === 'object' || type === 'function') {
+    applyProp(el, name, value);
+  } else {
+    applyAttr(el, name, /** @type {?(boolean|number|string)} */value);
+  }
+};
+
+/**
+ * Calls the appropriate attribute mutator for this attribute.
+ * @param {!Element} el
+ * @param {string} name The attribute's name.
+ * @param {*} value The attribute's value.
+ */
+var updateAttribute = function (el, name, value) {
+  var data = getData(el);
+  var attrs = data.attrs;
+
+  if (attrs[name] === value) {
+    return;
+  }
+
+  var mutator = attributes[name] || attributes[symbols.default];
+  mutator(el, name, value);
+
+  attrs[name] = value;
+};
+
+/**
+ * A publicly mutable object to provide custom mutators for attributes.
+ * @const {!Object<string, function(!Element, string, *)>}
+ */
+var attributes = createMap();
+
+// Special generic mutator that's called for any attribute that does not
+// have a specific mutator.
+attributes[symbols.default] = applyAttributeTyped;
+
+attributes['style'] = applyStyle;
+
+/**
+ * The offset in the virtual element declaration where the attributes are
+ * specified.
+ * @const
+ */
+var ATTRIBUTES_OFFSET = 3;
+
+/**
+ * Builds an array of arguments for use with elementOpenStart, attr and
+ * elementOpenEnd.
+ * @const {Array<*>}
+ */
+var argsBuilder = [];
+
+/**
+ * @param {string} tag The element's tag.
+ * @param {?string=} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>=} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ * @param {...*} var_args, Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ * @return {!Element} The corresponding Element.
+ */
+var elementOpen = function (tag, key, statics, var_args) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes('elementOpen');
+    assertNotInSkip('elementOpen');
+  }
+
+  var node = coreElementOpen(tag, key);
+  var data = getData(node);
+
+  if (!data.staticsApplied) {
+    if (statics) {
+      for (var _i = 0; _i < statics.length; _i += 2) {
+        var name = /** @type {string} */statics[_i];
+        var value = statics[_i + 1];
+        updateAttribute(node, name, value);
+      }
+    }
+    // Down the road, we may want to keep track of the statics array to use it
+    // as an additional signal about whether a node matches or not. For now,
+    // just use a marker so that we do not reapply statics.
+    data.staticsApplied = true;
+  }
+
+  /*
+   * Checks to see if one or more attributes have changed for a given Element.
+   * When no attributes have changed, this is much faster than checking each
+   * individual argument. When attributes have changed, the overhead of this is
+   * minimal.
+   */
+  var attrsArr = data.attrsArr;
+  var newAttrs = data.newAttrs;
+  var isNew = !attrsArr.length;
+  var i = ATTRIBUTES_OFFSET;
+  var j = 0;
+
+  for (; i < arguments.length; i += 2, j += 2) {
+    var _attr = arguments[i];
+    if (isNew) {
+      attrsArr[j] = _attr;
+      newAttrs[_attr] = undefined;
+    } else if (attrsArr[j] !== _attr) {
+      break;
+    }
+
+    var value = arguments[i + 1];
+    if (isNew || attrsArr[j + 1] !== value) {
+      attrsArr[j + 1] = value;
+      updateAttribute(node, _attr, value);
+    }
+  }
+
+  if (i < arguments.length || j < attrsArr.length) {
+    for (; i < arguments.length; i += 1, j += 1) {
+      attrsArr[j] = arguments[i];
+    }
+
+    if (j < attrsArr.length) {
+      attrsArr.length = j;
+    }
+
+    /*
+     * Actually perform the attribute update.
+     */
+    for (i = 0; i < attrsArr.length; i += 2) {
+      var name = /** @type {string} */attrsArr[i];
+      var value = attrsArr[i + 1];
+      newAttrs[name] = value;
+    }
+
+    for (var _attr2 in newAttrs) {
+      updateAttribute(node, _attr2, newAttrs[_attr2]);
+      newAttrs[_attr2] = undefined;
+    }
+  }
+
+  return node;
+};
+
+/**
+ * Declares a virtual Element at the current location in the document. This
+ * corresponds to an opening tag and a elementClose tag is required. This is
+ * like elementOpen, but the attributes are defined using the attr function
+ * rather than being passed as arguments. Must be folllowed by 0 or more calls
+ * to attr, then a call to elementOpenEnd.
+ * @param {string} tag The element's tag.
+ * @param {?string=} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>=} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ */
+var elementOpenStart = function (tag, key, statics) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes('elementOpenStart');
+    setInAttributes(true);
+  }
+
+  argsBuilder[0] = tag;
+  argsBuilder[1] = key;
+  argsBuilder[2] = statics;
+};
+
+/***
+ * Defines a virtual attribute at this point of the DOM. This is only valid
+ * when called between elementOpenStart and elementOpenEnd.
+ *
+ * @param {string} name
+ * @param {*} value
+ */
+var attr = function (name, value) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInAttributes('attr');
+  }
+
+  argsBuilder.push(name);
+  argsBuilder.push(value);
+};
+
+/**
+ * Closes an open tag started with elementOpenStart.
+ * @return {!Element} The corresponding Element.
+ */
+var elementOpenEnd = function () {
+  if (process.env.NODE_ENV !== 'production') {
+    assertInAttributes('elementOpenEnd');
+    setInAttributes(false);
+  }
+
+  var node = elementOpen.apply(null, argsBuilder);
+  argsBuilder.length = 0;
+  return node;
+};
+
+/**
+ * Closes an open virtual Element.
+ *
+ * @param {string} tag The element's tag.
+ * @return {!Element} The corresponding Element.
+ */
+var elementClose = function (tag) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes('elementClose');
+  }
+
+  var node = coreElementClose();
+
+  if (process.env.NODE_ENV !== 'production') {
+    assertCloseMatchesOpenTag(getData(node).nodeName, tag);
+  }
+
+  return node;
+};
+
+/**
+ * Declares a virtual Element at the current location in the document that has
+ * no children.
+ * @param {string} tag The element's tag.
+ * @param {?string=} key The key used to identify this element. This can be an
+ *     empty string, but performance may be better if a unique value is used
+ *     when iterating over an array of items.
+ * @param {?Array<*>=} statics An array of attribute name/value pairs of the
+ *     static attributes for the Element. These will only be set once when the
+ *     Element is created.
+ * @param {...*} var_args Attribute name/value pairs of the dynamic attributes
+ *     for the Element.
+ * @return {!Element} The corresponding Element.
+ */
+var elementVoid = function (tag, key, statics, var_args) {
+  elementOpen.apply(null, arguments);
+  return elementClose(tag);
+};
+
+/**
+ * Declares a virtual Text at this point in the document.
+ *
+ * @param {string|number|boolean} value The value of the Text.
+ * @param {...(function((string|number|boolean)):string)} var_args
+ *     Functions to format the value which are called only when the value has
+ *     changed.
+ * @return {!Text} The corresponding text node.
+ */
+var text = function (value, var_args) {
+  if (process.env.NODE_ENV !== 'production') {
+    assertNotInAttributes('text');
+    assertNotInSkip('text');
+  }
+
+  var node = coreText();
+  var data = getData(node);
+
+  if (data.text !== value) {
+    data.text = /** @type {string} */value;
+
+    var formatted = value;
+    for (var i = 1; i < arguments.length; i += 1) {
+      /*
+       * Call the formatter function directly to prevent leaking arguments.
+       * https://github.com/google/incremental-dom/pull/204#issuecomment-178223574
+       */
+      var fn = arguments[i];
+      formatted = fn(formatted);
+    }
+
+    node.data = formatted;
+  }
+
+  return node;
+};
+
+exports.patch = patchInner;
+exports.patchInner = patchInner;
+exports.patchOuter = patchOuter;
+exports.currentElement = currentElement;
+exports.currentPointer = currentPointer;
+exports.skip = skip;
+exports.skipNode = skipNode;
+exports.elementVoid = elementVoid;
+exports.elementOpenStart = elementOpenStart;
+exports.elementOpenEnd = elementOpenEnd;
+exports.elementOpen = elementOpen;
+exports.elementClose = elementClose;
+exports.text = text;
+exports.attr = attr;
+exports.symbols = symbols;
+exports.attributes = attributes;
+exports.applyAttr = applyAttr;
+exports.applyProp = applyProp;
+exports.notifications = notifications;
+exports.importNode = importNode;
+
+//# sourceMappingURL=incremental-dom-cjs.js.map
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__("./node_modules/process/browser.js")))
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_Symbol.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__root_js__ = __webpack_require__("./node_modules/lodash-es/_root.js");
+
+
+/** Built-in value references. */
+var Symbol = __WEBPACK_IMPORTED_MODULE_0__root_js__["a" /* default */].Symbol;
+
+/* harmony default export */ __webpack_exports__["a"] = (Symbol);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_baseGetTag.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Symbol_js__ = __webpack_require__("./node_modules/lodash-es/_Symbol.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__getRawTag_js__ = __webpack_require__("./node_modules/lodash-es/_getRawTag.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__objectToString_js__ = __webpack_require__("./node_modules/lodash-es/_objectToString.js");
+
+
+
+
+/** `Object#toString` result references. */
+var nullTag = '[object Null]',
+    undefinedTag = '[object Undefined]';
+
+/** Built-in value references. */
+var symToStringTag = __WEBPACK_IMPORTED_MODULE_0__Symbol_js__["a" /* default */] ? __WEBPACK_IMPORTED_MODULE_0__Symbol_js__["a" /* default */].toStringTag : undefined;
+
+/**
+ * The base implementation of `getTag` without fallbacks for buggy environments.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the `toStringTag`.
+ */
+function baseGetTag(value) {
+  if (value == null) {
+    return value === undefined ? undefinedTag : nullTag;
+  }
+  return symToStringTag && symToStringTag in Object(value) ? Object(__WEBPACK_IMPORTED_MODULE_1__getRawTag_js__["a" /* default */])(value) : Object(__WEBPACK_IMPORTED_MODULE_2__objectToString_js__["a" /* default */])(value);
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (baseGetTag);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_freeGlobal.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global) {/** Detect free variable `global` from Node.js. */
+var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
+
+/* harmony default export */ __webpack_exports__["a"] = (freeGlobal);
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__("./node_modules/webpack/buildin/global.js")))
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_getPrototype.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__overArg_js__ = __webpack_require__("./node_modules/lodash-es/_overArg.js");
+
+
+/** Built-in value references. */
+var getPrototype = Object(__WEBPACK_IMPORTED_MODULE_0__overArg_js__["a" /* default */])(Object.getPrototypeOf, Object);
+
+/* harmony default export */ __webpack_exports__["a"] = (getPrototype);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_getRawTag.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__Symbol_js__ = __webpack_require__("./node_modules/lodash-es/_Symbol.js");
+
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var nativeObjectToString = objectProto.toString;
+
+/** Built-in value references. */
+var symToStringTag = __WEBPACK_IMPORTED_MODULE_0__Symbol_js__["a" /* default */] ? __WEBPACK_IMPORTED_MODULE_0__Symbol_js__["a" /* default */].toStringTag : undefined;
+
+/**
+ * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the raw `toStringTag`.
+ */
+function getRawTag(value) {
+  var isOwn = hasOwnProperty.call(value, symToStringTag),
+      tag = value[symToStringTag];
+
+  try {
+    value[symToStringTag] = undefined;
+    var unmasked = true;
+  } catch (e) {}
+
+  var result = nativeObjectToString.call(value);
+  if (unmasked) {
+    if (isOwn) {
+      value[symToStringTag] = tag;
+    } else {
+      delete value[symToStringTag];
+    }
+  }
+  return result;
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (getRawTag);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_objectToString.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var nativeObjectToString = objectProto.toString;
+
+/**
+ * Converts `value` to a string using `Object.prototype.toString`.
+ *
+ * @private
+ * @param {*} value The value to convert.
+ * @returns {string} Returns the converted string.
+ */
+function objectToString(value) {
+  return nativeObjectToString.call(value);
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (objectToString);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_overArg.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/**
+ * Creates a unary function that invokes `func` with its argument transformed.
+ *
+ * @private
+ * @param {Function} func The function to wrap.
+ * @param {Function} transform The argument transform.
+ * @returns {Function} Returns the new function.
+ */
+function overArg(func, transform) {
+  return function (arg) {
+    return func(transform(arg));
+  };
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (overArg);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/_root.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__freeGlobal_js__ = __webpack_require__("./node_modules/lodash-es/_freeGlobal.js");
+
+
+/** Detect free variable `self`. */
+var freeSelf = typeof self == 'object' && self && self.Object === Object && self;
+
+/** Used as a reference to the global object. */
+var root = __WEBPACK_IMPORTED_MODULE_0__freeGlobal_js__["a" /* default */] || freeSelf || Function('return this')();
+
+/* harmony default export */ __webpack_exports__["a"] = (root);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/isObjectLike.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/**
+ * Checks if `value` is object-like. A value is object-like if it's not `null`
+ * and has a `typeof` result of "object".
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ * @example
+ *
+ * _.isObjectLike({});
+ * // => true
+ *
+ * _.isObjectLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isObjectLike(_.noop);
+ * // => false
+ *
+ * _.isObjectLike(null);
+ * // => false
+ */
+function isObjectLike(value) {
+  return value != null && typeof value == 'object';
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (isObjectLike);
+
+/***/ }),
+
+/***/ "./node_modules/lodash-es/isPlainObject.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__baseGetTag_js__ = __webpack_require__("./node_modules/lodash-es/_baseGetTag.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__getPrototype_js__ = __webpack_require__("./node_modules/lodash-es/_getPrototype.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__isObjectLike_js__ = __webpack_require__("./node_modules/lodash-es/isObjectLike.js");
+
+
+
+
+/** `Object#toString` result references. */
+var objectTag = '[object Object]';
+
+/** Used for built-in method references. */
+var funcProto = Function.prototype,
+    objectProto = Object.prototype;
+
+/** Used to resolve the decompiled source of functions. */
+var funcToString = funcProto.toString;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/** Used to infer the `Object` constructor. */
+var objectCtorString = funcToString.call(Object);
+
+/**
+ * Checks if `value` is a plain object, that is, an object created by the
+ * `Object` constructor or one with a `[[Prototype]]` of `null`.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.8.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a plain object, else `false`.
+ * @example
+ *
+ * function Foo() {
+ *   this.a = 1;
+ * }
+ *
+ * _.isPlainObject(new Foo);
+ * // => false
+ *
+ * _.isPlainObject([1, 2, 3]);
+ * // => false
+ *
+ * _.isPlainObject({ 'x': 0, 'y': 0 });
+ * // => true
+ *
+ * _.isPlainObject(Object.create(null));
+ * // => true
+ */
+function isPlainObject(value) {
+  if (!Object(__WEBPACK_IMPORTED_MODULE_2__isObjectLike_js__["a" /* default */])(value) || Object(__WEBPACK_IMPORTED_MODULE_0__baseGetTag_js__["a" /* default */])(value) != objectTag) {
+    return false;
+  }
+  var proto = Object(__WEBPACK_IMPORTED_MODULE_1__getPrototype_js__["a" /* default */])(value);
+  if (proto === null) {
+    return true;
+  }
+  var Ctor = hasOwnProperty.call(proto, 'constructor') && proto.constructor;
+  return typeof Ctor == 'function' && Ctor instanceof Ctor && funcToString.call(Ctor) == objectCtorString;
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (isPlainObject);
+
+/***/ }),
+
+/***/ "./node_modules/lodash.debounce/index.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(global) {/**
+ * lodash (Custom Build) <https://lodash.com/>
+ * Build: `lodash modularize exports="npm" -o ./`
+ * Copyright jQuery Foundation and other contributors <https://jquery.org/>
+ * Released under MIT license <https://lodash.com/license>
+ * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
+ * Copyright Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+ */
+
+/** Used as the `TypeError` message for "Functions" methods. */
+var FUNC_ERROR_TEXT = 'Expected a function';
+
+/** Used as references for various `Number` constants. */
+var NAN = 0 / 0;
+
+/** `Object#toString` result references. */
+var symbolTag = '[object Symbol]';
+
+/** Used to match leading and trailing whitespace. */
+var reTrim = /^\s+|\s+$/g;
+
+/** Used to detect bad signed hexadecimal string values. */
+var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
+
+/** Used to detect binary string values. */
+var reIsBinary = /^0b[01]+$/i;
+
+/** Used to detect octal string values. */
+var reIsOctal = /^0o[0-7]+$/i;
+
+/** Built-in method references without a dependency on `root`. */
+var freeParseInt = parseInt;
+
+/** Detect free variable `global` from Node.js. */
+var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
+
+/** Detect free variable `self`. */
+var freeSelf = typeof self == 'object' && self && self.Object === Object && self;
+
+/** Used as a reference to the global object. */
+var root = freeGlobal || freeSelf || Function('return this')();
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var objectToString = objectProto.toString;
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max,
+    nativeMin = Math.min;
+
+/**
+ * Gets the timestamp of the number of milliseconds that have elapsed since
+ * the Unix epoch (1 January 1970 00:00:00 UTC).
+ *
+ * @static
+ * @memberOf _
+ * @since 2.4.0
+ * @category Date
+ * @returns {number} Returns the timestamp.
+ * @example
+ *
+ * _.defer(function(stamp) {
+ *   console.log(_.now() - stamp);
+ * }, _.now());
+ * // => Logs the number of milliseconds it took for the deferred invocation.
+ */
+var now = function () {
+  return root.Date.now();
+};
+
+/**
+ * Creates a debounced function that delays invoking `func` until after `wait`
+ * milliseconds have elapsed since the last time the debounced function was
+ * invoked. The debounced function comes with a `cancel` method to cancel
+ * delayed `func` invocations and a `flush` method to immediately invoke them.
+ * Provide `options` to indicate whether `func` should be invoked on the
+ * leading and/or trailing edge of the `wait` timeout. The `func` is invoked
+ * with the last arguments provided to the debounced function. Subsequent
+ * calls to the debounced function return the result of the last `func`
+ * invocation.
+ *
+ * **Note:** If `leading` and `trailing` options are `true`, `func` is
+ * invoked on the trailing edge of the timeout only if the debounced function
+ * is invoked more than once during the `wait` timeout.
+ *
+ * If `wait` is `0` and `leading` is `false`, `func` invocation is deferred
+ * until to the next tick, similar to `setTimeout` with a timeout of `0`.
+ *
+ * See [David Corbacho's article](https://css-tricks.com/debouncing-throttling-explained-examples/)
+ * for details over the differences between `_.debounce` and `_.throttle`.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Function
+ * @param {Function} func The function to debounce.
+ * @param {number} [wait=0] The number of milliseconds to delay.
+ * @param {Object} [options={}] The options object.
+ * @param {boolean} [options.leading=false]
+ *  Specify invoking on the leading edge of the timeout.
+ * @param {number} [options.maxWait]
+ *  The maximum time `func` is allowed to be delayed before it's invoked.
+ * @param {boolean} [options.trailing=true]
+ *  Specify invoking on the trailing edge of the timeout.
+ * @returns {Function} Returns the new debounced function.
+ * @example
+ *
+ * // Avoid costly calculations while the window size is in flux.
+ * jQuery(window).on('resize', _.debounce(calculateLayout, 150));
+ *
+ * // Invoke `sendMail` when clicked, debouncing subsequent calls.
+ * jQuery(element).on('click', _.debounce(sendMail, 300, {
+ *   'leading': true,
+ *   'trailing': false
+ * }));
+ *
+ * // Ensure `batchLog` is invoked once after 1 second of debounced calls.
+ * var debounced = _.debounce(batchLog, 250, { 'maxWait': 1000 });
+ * var source = new EventSource('/stream');
+ * jQuery(source).on('message', debounced);
+ *
+ * // Cancel the trailing debounced invocation.
+ * jQuery(window).on('popstate', debounced.cancel);
+ */
+function debounce(func, wait, options) {
+  var lastArgs,
+      lastThis,
+      maxWait,
+      result,
+      timerId,
+      lastCallTime,
+      lastInvokeTime = 0,
+      leading = false,
+      maxing = false,
+      trailing = true;
+
+  if (typeof func != 'function') {
+    throw new TypeError(FUNC_ERROR_TEXT);
+  }
+  wait = toNumber(wait) || 0;
+  if (isObject(options)) {
+    leading = !!options.leading;
+    maxing = 'maxWait' in options;
+    maxWait = maxing ? nativeMax(toNumber(options.maxWait) || 0, wait) : maxWait;
+    trailing = 'trailing' in options ? !!options.trailing : trailing;
+  }
+
+  function invokeFunc(time) {
+    var args = lastArgs,
+        thisArg = lastThis;
+
+    lastArgs = lastThis = undefined;
+    lastInvokeTime = time;
+    result = func.apply(thisArg, args);
+    return result;
+  }
+
+  function leadingEdge(time) {
+    // Reset any `maxWait` timer.
+    lastInvokeTime = time;
+    // Start the timer for the trailing edge.
+    timerId = setTimeout(timerExpired, wait);
+    // Invoke the leading edge.
+    return leading ? invokeFunc(time) : result;
+  }
+
+  function remainingWait(time) {
+    var timeSinceLastCall = time - lastCallTime,
+        timeSinceLastInvoke = time - lastInvokeTime,
+        result = wait - timeSinceLastCall;
+
+    return maxing ? nativeMin(result, maxWait - timeSinceLastInvoke) : result;
+  }
+
+  function shouldInvoke(time) {
+    var timeSinceLastCall = time - lastCallTime,
+        timeSinceLastInvoke = time - lastInvokeTime;
+
+    // Either this is the first call, activity has stopped and we're at the
+    // trailing edge, the system time has gone backwards and we're treating
+    // it as the trailing edge, or we've hit the `maxWait` limit.
+    return lastCallTime === undefined || timeSinceLastCall >= wait || timeSinceLastCall < 0 || maxing && timeSinceLastInvoke >= maxWait;
+  }
+
+  function timerExpired() {
+    var time = now();
+    if (shouldInvoke(time)) {
+      return trailingEdge(time);
+    }
+    // Restart the timer.
+    timerId = setTimeout(timerExpired, remainingWait(time));
+  }
+
+  function trailingEdge(time) {
+    timerId = undefined;
+
+    // Only invoke if we have `lastArgs` which means `func` has been
+    // debounced at least once.
+    if (trailing && lastArgs) {
+      return invokeFunc(time);
+    }
+    lastArgs = lastThis = undefined;
+    return result;
+  }
+
+  function cancel() {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+    lastInvokeTime = 0;
+    lastArgs = lastCallTime = lastThis = timerId = undefined;
+  }
+
+  function flush() {
+    return timerId === undefined ? result : trailingEdge(now());
+  }
+
+  function debounced() {
+    var time = now(),
+        isInvoking = shouldInvoke(time);
+
+    lastArgs = arguments;
+    lastThis = this;
+    lastCallTime = time;
+
+    if (isInvoking) {
+      if (timerId === undefined) {
+        return leadingEdge(lastCallTime);
+      }
+      if (maxing) {
+        // Handle invocations in a tight loop.
+        timerId = setTimeout(timerExpired, wait);
+        return invokeFunc(lastCallTime);
+      }
+    }
+    if (timerId === undefined) {
+      timerId = setTimeout(timerExpired, wait);
+    }
+    return result;
+  }
+  debounced.cancel = cancel;
+  debounced.flush = flush;
+  return debounced;
+}
+
+/**
+ * Checks if `value` is the
+ * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
+ * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(_.noop);
+ * // => true
+ *
+ * _.isObject(null);
+ * // => false
+ */
+function isObject(value) {
+  var type = typeof value;
+  return !!value && (type == 'object' || type == 'function');
+}
+
+/**
+ * Checks if `value` is object-like. A value is object-like if it's not `null`
+ * and has a `typeof` result of "object".
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ * @example
+ *
+ * _.isObjectLike({});
+ * // => true
+ *
+ * _.isObjectLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isObjectLike(_.noop);
+ * // => false
+ *
+ * _.isObjectLike(null);
+ * // => false
+ */
+function isObjectLike(value) {
+  return !!value && typeof value == 'object';
+}
+
+/**
+ * Checks if `value` is classified as a `Symbol` primitive or object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
+ * @example
+ *
+ * _.isSymbol(Symbol.iterator);
+ * // => true
+ *
+ * _.isSymbol('abc');
+ * // => false
+ */
+function isSymbol(value) {
+  return typeof value == 'symbol' || isObjectLike(value) && objectToString.call(value) == symbolTag;
+}
+
+/**
+ * Converts `value` to a number.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to process.
+ * @returns {number} Returns the number.
+ * @example
+ *
+ * _.toNumber(3.2);
+ * // => 3.2
+ *
+ * _.toNumber(Number.MIN_VALUE);
+ * // => 5e-324
+ *
+ * _.toNumber(Infinity);
+ * // => Infinity
+ *
+ * _.toNumber('3.2');
+ * // => 3.2
+ */
+function toNumber(value) {
+  if (typeof value == 'number') {
+    return value;
+  }
+  if (isSymbol(value)) {
+    return NAN;
+  }
+  if (isObject(value)) {
+    var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
+    value = isObject(other) ? other + '' : other;
+  }
+  if (typeof value != 'string') {
+    return value === 0 ? value : +value;
+  }
+  value = value.replace(reTrim, '');
+  var isBinary = reIsBinary.test(value);
+  return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
+}
+
+module.exports = debounce;
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__("./node_modules/webpack/buildin/global.js")))
+
+/***/ }),
+
+/***/ "./node_modules/process/browser.js":
+/***/ (function(module, exports) {
+
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout() {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+})();
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch (e) {
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch (e) {
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e) {
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e) {
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while (len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) {
+    return [];
+};
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () {
+    return '/';
+};
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function () {
+    return 0;
+};
+
+/***/ }),
+
+/***/ "./node_modules/pwet-idom/src/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return IDOMComponent; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return renderComponent; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_idom_util__ = __webpack_require__("./node_modules/idom-util/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pwet__ = __webpack_require__("../../src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_lodash_debounce__ = __webpack_require__("./node_modules/lodash.debounce/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_lodash_debounce___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3_lodash_debounce__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_incremental_dom__ = __webpack_require__("./node_modules/incremental-dom/dist/incremental-dom-cjs.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_incremental_dom___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_4_incremental_dom__);
+
+
+
+
+
+
+const $update = Symbol('__update');
+const $properties = Symbol('__properties');
+const defaultAttributeApply = __WEBPACK_IMPORTED_MODULE_4_incremental_dom__["attributes"][__WEBPACK_IMPORTED_MODULE_4_incremental_dom__["symbols"].default];
+
+__WEBPACK_IMPORTED_MODULE_4_incremental_dom__["attributes"][__WEBPACK_IMPORTED_MODULE_4_incremental_dom__["symbols"].default] = (element, name, value) => {
+
+  if (!(__WEBPACK_IMPORTED_MODULE_2_pwet__["a" /* $pwet */] in element)) return void defaultAttributeApply(element, name, value);
+
+  const { definition, update } = element[__WEBPACK_IMPORTED_MODULE_2_pwet__["a" /* $pwet */]];
+  const { tagName, verbose, properties } = definition;
+
+  if (!(name in properties)) return void defaultAttributeApply(element, name, value);
+
+  if (verbose) console.log('IDOM applyProperty', name, value);
+  //console.error(`[${tagName}]`, 'IDOM', name, value);
+
+  if (!element[$update]) element[$update] = __WEBPACK_IMPORTED_MODULE_3_lodash_debounce___default()(() => {
+
+    update(element[$properties], { partial: true });
+
+    element[$properties] = {};
+  }, 0);
+
+  if (!element[$properties]) element[$properties] = {};
+
+  element[$properties][name] = value;
+
+  element[$update]();
+};
+
+const IDOMComponent = component => {
+
+  const { hooks } = component;
+
+  hooks.render = Object(__WEBPACK_IMPORTED_MODULE_1_pwet_src_utilities__["b" /* decorate */])(hooks.render, (next, component) => {
+
+    Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["patch"])(component.root, next, component);
+  });
+
+  return component;
+};
+
+const renderComponent = (...args) => Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["renderElement"])(...args, __WEBPACK_IMPORTED_MODULE_0_idom_util__["skip"]);
+
+
+
+/***/ }),
+
+/***/ "./node_modules/redux-logger/dist/redux-logger.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(global) {!function (e, t) {
+   true ? t(exports) : "function" == typeof define && define.amd ? define(["exports"], t) : t(e.reduxLogger = e.reduxLogger || {});
+}(this, function (e) {
+  "use strict";
+  function t(e, t) {
+    e.super_ = t, e.prototype = Object.create(t.prototype, { constructor: { value: e, enumerable: !1, writable: !0, configurable: !0 } });
+  }function r(e, t) {
+    Object.defineProperty(this, "kind", { value: e, enumerable: !0 }), t && t.length && Object.defineProperty(this, "path", { value: t, enumerable: !0 });
+  }function n(e, t, r) {
+    n.super_.call(this, "E", e), Object.defineProperty(this, "lhs", { value: t, enumerable: !0 }), Object.defineProperty(this, "rhs", { value: r, enumerable: !0 });
+  }function o(e, t) {
+    o.super_.call(this, "N", e), Object.defineProperty(this, "rhs", { value: t, enumerable: !0 });
+  }function i(e, t) {
+    i.super_.call(this, "D", e), Object.defineProperty(this, "lhs", { value: t, enumerable: !0 });
+  }function a(e, t, r) {
+    a.super_.call(this, "A", e), Object.defineProperty(this, "index", { value: t, enumerable: !0 }), Object.defineProperty(this, "item", { value: r, enumerable: !0 });
+  }function f(e, t, r) {
+    var n = e.slice((r || t) + 1 || e.length);return e.length = t < 0 ? e.length + t : t, e.push.apply(e, n), e;
+  }function u(e) {
+    var t = "undefined" == typeof e ? "undefined" : N(e);return "object" !== t ? t : e === Math ? "math" : null === e ? "null" : Array.isArray(e) ? "array" : "[object Date]" === Object.prototype.toString.call(e) ? "date" : "function" == typeof e.toString && /^\/.*\//.test(e.toString()) ? "regexp" : "object";
+  }function l(e, t, r, c, s, d, p) {
+    s = s || [], p = p || [];var g = s.slice(0);if ("undefined" != typeof d) {
+      if (c) {
+        if ("function" == typeof c && c(g, d)) return;if ("object" === ("undefined" == typeof c ? "undefined" : N(c))) {
+          if (c.prefilter && c.prefilter(g, d)) return;if (c.normalize) {
+            var h = c.normalize(g, d, e, t);h && (e = h[0], t = h[1]);
+          }
+        }
+      }g.push(d);
+    }"regexp" === u(e) && "regexp" === u(t) && (e = e.toString(), t = t.toString());var y = "undefined" == typeof e ? "undefined" : N(e),
+        v = "undefined" == typeof t ? "undefined" : N(t),
+        b = "undefined" !== y || p && p[p.length - 1].lhs && p[p.length - 1].lhs.hasOwnProperty(d),
+        m = "undefined" !== v || p && p[p.length - 1].rhs && p[p.length - 1].rhs.hasOwnProperty(d);if (!b && m) r(new o(g, t));else if (!m && b) r(new i(g, e));else if (u(e) !== u(t)) r(new n(g, e, t));else if ("date" === u(e) && e - t !== 0) r(new n(g, e, t));else if ("object" === y && null !== e && null !== t) {
+      if (p.filter(function (t) {
+        return t.lhs === e;
+      }).length) e !== t && r(new n(g, e, t));else {
+        if (p.push({ lhs: e, rhs: t }), Array.isArray(e)) {
+          var w;e.length;for (w = 0; w < e.length; w++) w >= t.length ? r(new a(g, w, new i(void 0, e[w]))) : l(e[w], t[w], r, c, g, w, p);for (; w < t.length;) r(new a(g, w, new o(void 0, t[w++])));
+        } else {
+          var x = Object.keys(e),
+              S = Object.keys(t);x.forEach(function (n, o) {
+            var i = S.indexOf(n);i >= 0 ? (l(e[n], t[n], r, c, g, n, p), S = f(S, i)) : l(e[n], void 0, r, c, g, n, p);
+          }), S.forEach(function (e) {
+            l(void 0, t[e], r, c, g, e, p);
+          });
+        }p.length = p.length - 1;
+      }
+    } else e !== t && ("number" === y && isNaN(e) && isNaN(t) || r(new n(g, e, t)));
+  }function c(e, t, r, n) {
+    return n = n || [], l(e, t, function (e) {
+      e && n.push(e);
+    }, r), n.length ? n : void 0;
+  }function s(e, t, r) {
+    if (r.path && r.path.length) {
+      var n,
+          o = e[t],
+          i = r.path.length - 1;for (n = 0; n < i; n++) o = o[r.path[n]];switch (r.kind) {case "A":
+          s(o[r.path[n]], r.index, r.item);break;case "D":
+          delete o[r.path[n]];break;case "E":case "N":
+          o[r.path[n]] = r.rhs;}
+    } else switch (r.kind) {case "A":
+        s(e[t], r.index, r.item);break;case "D":
+        e = f(e, t);break;case "E":case "N":
+        e[t] = r.rhs;}return e;
+  }function d(e, t, r) {
+    if (e && t && r && r.kind) {
+      for (var n = e, o = -1, i = r.path ? r.path.length - 1 : 0; ++o < i;) "undefined" == typeof n[r.path[o]] && (n[r.path[o]] = "number" == typeof r.path[o] ? [] : {}), n = n[r.path[o]];switch (r.kind) {case "A":
+          s(r.path ? n[r.path[o]] : n, r.index, r.item);break;case "D":
+          delete n[r.path[o]];break;case "E":case "N":
+          n[r.path[o]] = r.rhs;}
+    }
+  }function p(e, t, r) {
+    if (r.path && r.path.length) {
+      var n,
+          o = e[t],
+          i = r.path.length - 1;for (n = 0; n < i; n++) o = o[r.path[n]];switch (r.kind) {case "A":
+          p(o[r.path[n]], r.index, r.item);break;case "D":
+          o[r.path[n]] = r.lhs;break;case "E":
+          o[r.path[n]] = r.lhs;break;case "N":
+          delete o[r.path[n]];}
+    } else switch (r.kind) {case "A":
+        p(e[t], r.index, r.item);break;case "D":
+        e[t] = r.lhs;break;case "E":
+        e[t] = r.lhs;break;case "N":
+        e = f(e, t);}return e;
+  }function g(e, t, r) {
+    if (e && t && r && r.kind) {
+      var n,
+          o,
+          i = e;for (o = r.path.length - 1, n = 0; n < o; n++) "undefined" == typeof i[r.path[n]] && (i[r.path[n]] = {}), i = i[r.path[n]];switch (r.kind) {case "A":
+          p(i[r.path[n]], r.index, r.item);break;case "D":
+          i[r.path[n]] = r.lhs;break;case "E":
+          i[r.path[n]] = r.lhs;break;case "N":
+          delete i[r.path[n]];}
+    }
+  }function h(e, t, r) {
+    if (e && t) {
+      var n = function (n) {
+        r && !r(e, t, n) || d(e, t, n);
+      };l(e, t, n);
+    }
+  }function y(e) {
+    return "color: " + F[e].color + "; font-weight: bold";
+  }function v(e) {
+    var t = e.kind,
+        r = e.path,
+        n = e.lhs,
+        o = e.rhs,
+        i = e.index,
+        a = e.item;switch (t) {case "E":
+        return [r.join("."), n, "→", o];case "N":
+        return [r.join("."), o];case "D":
+        return [r.join(".")];case "A":
+        return [r.join(".") + "[" + i + "]", a];default:
+        return [];}
+  }function b(e, t, r, n) {
+    var o = c(e, t);try {
+      n ? r.groupCollapsed("diff") : r.group("diff");
+    } catch (e) {
+      r.log("diff");
+    }o ? o.forEach(function (e) {
+      var t = e.kind,
+          n = v(e);r.log.apply(r, ["%c " + F[t].text, y(t)].concat(P(n)));
+    }) : r.log("—— no diff ——");try {
+      r.groupEnd();
+    } catch (e) {
+      r.log("—— diff end —— ");
+    }
+  }function m(e, t, r, n) {
+    switch ("undefined" == typeof e ? "undefined" : N(e)) {case "object":
+        return "function" == typeof e[n] ? e[n].apply(e, P(r)) : e[n];case "function":
+        return e(t);default:
+        return e;}
+  }function w(e) {
+    var t = e.timestamp,
+        r = e.duration;return function (e, n, o) {
+      var i = ["action"];return i.push("%c" + String(e.type)), t && i.push("%c@ " + n), r && i.push("%c(in " + o.toFixed(2) + " ms)"), i.join(" ");
+    };
+  }function x(e, t) {
+    var r = t.logger,
+        n = t.actionTransformer,
+        o = t.titleFormatter,
+        i = void 0 === o ? w(t) : o,
+        a = t.collapsed,
+        f = t.colors,
+        u = t.level,
+        l = t.diff,
+        c = "undefined" == typeof t.titleFormatter;e.forEach(function (o, s) {
+      var d = o.started,
+          p = o.startedTime,
+          g = o.action,
+          h = o.prevState,
+          y = o.error,
+          v = o.took,
+          w = o.nextState,
+          x = e[s + 1];x && (w = x.prevState, v = x.started - d);var S = n(g),
+          k = "function" == typeof a ? a(function () {
+        return w;
+      }, g, o) : a,
+          j = D(p),
+          E = f.title ? "color: " + f.title(S) + ";" : "",
+          A = ["color: gray; font-weight: lighter;"];A.push(E), t.timestamp && A.push("color: gray; font-weight: lighter;"), t.duration && A.push("color: gray; font-weight: lighter;");var O = i(S, j, v);try {
+        k ? f.title && c ? r.groupCollapsed.apply(r, ["%c " + O].concat(A)) : r.groupCollapsed(O) : f.title && c ? r.group.apply(r, ["%c " + O].concat(A)) : r.group(O);
+      } catch (e) {
+        r.log(O);
+      }var N = m(u, S, [h], "prevState"),
+          P = m(u, S, [S], "action"),
+          C = m(u, S, [y, h], "error"),
+          F = m(u, S, [w], "nextState");if (N) if (f.prevState) {
+        var L = "color: " + f.prevState(h) + "; font-weight: bold";r[N]("%c prev state", L, h);
+      } else r[N]("prev state", h);if (P) if (f.action) {
+        var T = "color: " + f.action(S) + "; font-weight: bold";r[P]("%c action    ", T, S);
+      } else r[P]("action    ", S);if (y && C) if (f.error) {
+        var M = "color: " + f.error(y, h) + "; font-weight: bold;";r[C]("%c error     ", M, y);
+      } else r[C]("error     ", y);if (F) if (f.nextState) {
+        var _ = "color: " + f.nextState(w) + "; font-weight: bold";r[F]("%c next state", _, w);
+      } else r[F]("next state", w);l && b(h, w, r, k);try {
+        r.groupEnd();
+      } catch (e) {
+        r.log("—— log end ——");
+      }
+    });
+  }function S() {
+    var e = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {},
+        t = Object.assign({}, L, e),
+        r = t.logger,
+        n = t.stateTransformer,
+        o = t.errorTransformer,
+        i = t.predicate,
+        a = t.logErrors,
+        f = t.diffPredicate;if ("undefined" == typeof r) return function () {
+      return function (e) {
+        return function (t) {
+          return e(t);
+        };
+      };
+    };if (e.getState && e.dispatch) return console.error("[redux-logger] redux-logger not installed. Make sure to pass logger instance as middleware:\n// Logger with default options\nimport { logger } from 'redux-logger'\nconst store = createStore(\n  reducer,\n  applyMiddleware(logger)\n)\n// Or you can create your own logger with custom options http://bit.ly/redux-logger-options\nimport createLogger from 'redux-logger'\nconst logger = createLogger({\n  // ...options\n});\nconst store = createStore(\n  reducer,\n  applyMiddleware(logger)\n)\n"), function () {
+      return function (e) {
+        return function (t) {
+          return e(t);
+        };
+      };
+    };var u = [];return function (e) {
+      var r = e.getState;return function (e) {
+        return function (l) {
+          if ("function" == typeof i && !i(r, l)) return e(l);var c = {};u.push(c), c.started = O.now(), c.startedTime = new Date(), c.prevState = n(r()), c.action = l;var s = void 0;if (a) try {
+            s = e(l);
+          } catch (e) {
+            c.error = o(e);
+          } else s = e(l);c.took = O.now() - c.started, c.nextState = n(r());var d = t.diff && "function" == typeof f ? f(r, l) : t.diff;if (x(u, Object.assign({}, t, { diff: d })), u.length = 0, c.error) throw c.error;return s;
+        };
+      };
+    };
+  }var k,
+      j,
+      E = function (e, t) {
+    return new Array(t + 1).join(e);
+  },
+      A = function (e, t) {
+    return E("0", t - e.toString().length) + e;
+  },
+      D = function (e) {
+    return A(e.getHours(), 2) + ":" + A(e.getMinutes(), 2) + ":" + A(e.getSeconds(), 2) + "." + A(e.getMilliseconds(), 3);
+  },
+      O = "undefined" != typeof performance && null !== performance && "function" == typeof performance.now ? performance : Date,
+      N = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (e) {
+    return typeof e;
+  } : function (e) {
+    return e && "function" == typeof Symbol && e.constructor === Symbol && e !== Symbol.prototype ? "symbol" : typeof e;
+  },
+      P = function (e) {
+    if (Array.isArray(e)) {
+      for (var t = 0, r = Array(e.length); t < e.length; t++) r[t] = e[t];return r;
+    }return Array.from(e);
+  },
+      C = [];k = "object" === ("undefined" == typeof global ? "undefined" : N(global)) && global ? global : "undefined" != typeof window ? window : {}, j = k.DeepDiff, j && C.push(function () {
+    "undefined" != typeof j && k.DeepDiff === c && (k.DeepDiff = j, j = void 0);
+  }), t(n, r), t(o, r), t(i, r), t(a, r), Object.defineProperties(c, { diff: { value: c, enumerable: !0 }, observableDiff: { value: l, enumerable: !0 }, applyDiff: { value: h, enumerable: !0 }, applyChange: { value: d, enumerable: !0 }, revertChange: { value: g, enumerable: !0 }, isConflict: { value: function () {
+        return "undefined" != typeof j;
+      }, enumerable: !0 }, noConflict: { value: function () {
+        return C && (C.forEach(function (e) {
+          e();
+        }), C = null), c;
+      }, enumerable: !0 } });var F = { E: { color: "#2196F3", text: "CHANGED:" }, N: { color: "#4CAF50", text: "ADDED:" }, D: { color: "#F44336", text: "DELETED:" }, A: { color: "#2196F3", text: "ARRAY:" } },
+      L = { level: "log", logger: console, logErrors: !0, collapsed: void 0, predicate: void 0, duration: !1, timestamp: !0, stateTransformer: function (e) {
+      return e;
+    }, actionTransformer: function (e) {
+      return e;
+    }, errorTransformer: function (e) {
+      return e;
+    }, colors: { title: function () {
+        return "inherit";
+      }, prevState: function () {
+        return "#9E9E9E";
+      }, action: function () {
+        return "#03A9F4";
+      }, nextState: function () {
+        return "#4CAF50";
+      }, error: function () {
+        return "#F20404";
+      } }, diff: !1, diffPredicate: void 0, transformer: void 0 },
+      T = function () {
+    var e = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : {},
+        t = e.dispatch,
+        r = e.getState;return "function" == typeof t || "function" == typeof r ? S()({ dispatch: t, getState: r }) : void console.error("\n[redux-logger v3] BREAKING CHANGE\n[redux-logger v3] Since 3.0.0 redux-logger exports by default logger with default settings.\n[redux-logger v3] Change\n[redux-logger v3] import createLogger from 'redux-logger'\n[redux-logger v3] to\n[redux-logger v3] import { createLogger } from 'redux-logger'\n");
+  };e.defaults = L, e.createLogger = S, e.logger = T, e.default = T, Object.defineProperty(e, "__esModule", { value: !0 });
+});
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__("./node_modules/webpack/buildin/global.js")))
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/applyMiddleware.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (immutable) */ __webpack_exports__["a"] = applyMiddleware;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__compose__ = __webpack_require__("./node_modules/redux/es/compose.js");
+var _extends = Object.assign || function (target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }return target;
+};
+
+
+
+/**
+ * Creates a store enhancer that applies middleware to the dispatch method
+ * of the Redux store. This is handy for a variety of tasks, such as expressing
+ * asynchronous actions in a concise manner, or logging every action payload.
+ *
+ * See `redux-thunk` package as an example of the Redux middleware.
+ *
+ * Because middleware is potentially asynchronous, this should be the first
+ * store enhancer in the composition chain.
+ *
+ * Note that each middleware will be given the `dispatch` and `getState` functions
+ * as named arguments.
+ *
+ * @param {...Function} middlewares The middleware chain to be applied.
+ * @returns {Function} A store enhancer applying the middleware.
+ */
+function applyMiddleware() {
+  for (var _len = arguments.length, middlewares = Array(_len), _key = 0; _key < _len; _key++) {
+    middlewares[_key] = arguments[_key];
+  }
+
+  return function (createStore) {
+    return function (reducer, preloadedState, enhancer) {
+      var store = createStore(reducer, preloadedState, enhancer);
+      var _dispatch = store.dispatch;
+      var chain = [];
+
+      var middlewareAPI = {
+        getState: store.getState,
+        dispatch: function dispatch(action) {
+          return _dispatch(action);
+        }
+      };
+      chain = middlewares.map(function (middleware) {
+        return middleware(middlewareAPI);
+      });
+      _dispatch = __WEBPACK_IMPORTED_MODULE_0__compose__["a" /* default */].apply(undefined, chain)(store.dispatch);
+
+      return _extends({}, store, {
+        dispatch: _dispatch
+      });
+    };
+  };
+}
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/bindActionCreators.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* unused harmony export default */
+function bindActionCreator(actionCreator, dispatch) {
+  return function () {
+    return dispatch(actionCreator.apply(undefined, arguments));
+  };
+}
+
+/**
+ * Turns an object whose values are action creators, into an object with the
+ * same keys, but with every function wrapped into a `dispatch` call so they
+ * may be invoked directly. This is just a convenience method, as you can call
+ * `store.dispatch(MyActionCreators.doSomething())` yourself just fine.
+ *
+ * For convenience, you can also pass a single function as the first argument,
+ * and get a function in return.
+ *
+ * @param {Function|Object} actionCreators An object whose values are action
+ * creator functions. One handy way to obtain it is to use ES6 `import * as`
+ * syntax. You may also pass a single function.
+ *
+ * @param {Function} dispatch The `dispatch` function available on your Redux
+ * store.
+ *
+ * @returns {Function|Object} The object mimicking the original object, but with
+ * every action creator wrapped into the `dispatch` call. If you passed a
+ * function as `actionCreators`, the return value will also be a single
+ * function.
+ */
+function bindActionCreators(actionCreators, dispatch) {
+  if (typeof actionCreators === 'function') {
+    return bindActionCreator(actionCreators, dispatch);
+  }
+
+  if (typeof actionCreators !== 'object' || actionCreators === null) {
+    throw new Error('bindActionCreators expected an object or a function, instead received ' + (actionCreators === null ? 'null' : typeof actionCreators) + '. ' + 'Did you write "import ActionCreators from" instead of "import * as ActionCreators from"?');
+  }
+
+  var keys = Object.keys(actionCreators);
+  var boundActionCreators = {};
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var actionCreator = actionCreators[key];
+    if (typeof actionCreator === 'function') {
+      boundActionCreators[key] = bindActionCreator(actionCreator, dispatch);
+    }
+  }
+  return boundActionCreators;
+}
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/combineReducers.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {/* harmony export (immutable) */ __webpack_exports__["a"] = combineReducers;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__createStore__ = __webpack_require__("./node_modules/redux/es/createStore.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_lodash_es_isPlainObject__ = __webpack_require__("./node_modules/lodash-es/isPlainObject.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__utils_warning__ = __webpack_require__("./node_modules/redux/es/utils/warning.js");
+
+
+
+
+function getUndefinedStateErrorMessage(key, action) {
+  var actionType = action && action.type;
+  var actionName = actionType && '"' + actionType.toString() + '"' || 'an action';
+
+  return 'Given action ' + actionName + ', reducer "' + key + '" returned undefined. ' + 'To ignore an action, you must explicitly return the previous state. ' + 'If you want this reducer to hold no value, you can return null instead of undefined.';
+}
+
+function getUnexpectedStateShapeWarningMessage(inputState, reducers, action, unexpectedKeyCache) {
+  var reducerKeys = Object.keys(reducers);
+  var argumentName = action && action.type === __WEBPACK_IMPORTED_MODULE_0__createStore__["a" /* ActionTypes */].INIT ? 'preloadedState argument passed to createStore' : 'previous state received by the reducer';
+
+  if (reducerKeys.length === 0) {
+    return 'Store does not have a valid reducer. Make sure the argument passed ' + 'to combineReducers is an object whose values are reducers.';
+  }
+
+  if (!Object(__WEBPACK_IMPORTED_MODULE_1_lodash_es_isPlainObject__["a" /* default */])(inputState)) {
+    return 'The ' + argumentName + ' has unexpected type of "' + {}.toString.call(inputState).match(/\s([a-z|A-Z]+)/)[1] + '". Expected argument to be an object with the following ' + ('keys: "' + reducerKeys.join('", "') + '"');
+  }
+
+  var unexpectedKeys = Object.keys(inputState).filter(function (key) {
+    return !reducers.hasOwnProperty(key) && !unexpectedKeyCache[key];
+  });
+
+  unexpectedKeys.forEach(function (key) {
+    unexpectedKeyCache[key] = true;
+  });
+
+  if (unexpectedKeys.length > 0) {
+    return 'Unexpected ' + (unexpectedKeys.length > 1 ? 'keys' : 'key') + ' ' + ('"' + unexpectedKeys.join('", "') + '" found in ' + argumentName + '. ') + 'Expected to find one of the known reducer keys instead: ' + ('"' + reducerKeys.join('", "') + '". Unexpected keys will be ignored.');
+  }
+}
+
+function assertReducerShape(reducers) {
+  Object.keys(reducers).forEach(function (key) {
+    var reducer = reducers[key];
+    var initialState = reducer(undefined, { type: __WEBPACK_IMPORTED_MODULE_0__createStore__["a" /* ActionTypes */].INIT });
+
+    if (typeof initialState === 'undefined') {
+      throw new Error('Reducer "' + key + '" returned undefined during initialization. ' + 'If the state passed to the reducer is undefined, you must ' + 'explicitly return the initial state. The initial state may ' + 'not be undefined. If you don\'t want to set a value for this reducer, ' + 'you can use null instead of undefined.');
+    }
+
+    var type = '@@redux/PROBE_UNKNOWN_ACTION_' + Math.random().toString(36).substring(7).split('').join('.');
+    if (typeof reducer(undefined, { type: type }) === 'undefined') {
+      throw new Error('Reducer "' + key + '" returned undefined when probed with a random type. ' + ('Don\'t try to handle ' + __WEBPACK_IMPORTED_MODULE_0__createStore__["a" /* ActionTypes */].INIT + ' or other actions in "redux/*" ') + 'namespace. They are considered private. Instead, you must return the ' + 'current state for any unknown actions, unless it is undefined, ' + 'in which case you must return the initial state, regardless of the ' + 'action type. The initial state may not be undefined, but can be null.');
+    }
+  });
+}
+
+/**
+ * Turns an object whose values are different reducer functions, into a single
+ * reducer function. It will call every child reducer, and gather their results
+ * into a single state object, whose keys correspond to the keys of the passed
+ * reducer functions.
+ *
+ * @param {Object} reducers An object whose values correspond to different
+ * reducer functions that need to be combined into one. One handy way to obtain
+ * it is to use ES6 `import * as reducers` syntax. The reducers may never return
+ * undefined for any action. Instead, they should return their initial state
+ * if the state passed to them was undefined, and the current state for any
+ * unrecognized action.
+ *
+ * @returns {Function} A reducer function that invokes every reducer inside the
+ * passed object, and builds a state object with the same shape.
+ */
+function combineReducers(reducers) {
+  var reducerKeys = Object.keys(reducers);
+  var finalReducers = {};
+  for (var i = 0; i < reducerKeys.length; i++) {
+    var key = reducerKeys[i];
+
+    if (process.env.NODE_ENV !== 'production') {
+      if (typeof reducers[key] === 'undefined') {
+        Object(__WEBPACK_IMPORTED_MODULE_2__utils_warning__["a" /* default */])('No reducer provided for key "' + key + '"');
+      }
+    }
+
+    if (typeof reducers[key] === 'function') {
+      finalReducers[key] = reducers[key];
+    }
+  }
+  var finalReducerKeys = Object.keys(finalReducers);
+
+  var unexpectedKeyCache = void 0;
+  if (process.env.NODE_ENV !== 'production') {
+    unexpectedKeyCache = {};
+  }
+
+  var shapeAssertionError = void 0;
+  try {
+    assertReducerShape(finalReducers);
+  } catch (e) {
+    shapeAssertionError = e;
+  }
+
+  return function combination() {
+    var state = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    var action = arguments[1];
+
+    if (shapeAssertionError) {
+      throw shapeAssertionError;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      var warningMessage = getUnexpectedStateShapeWarningMessage(state, finalReducers, action, unexpectedKeyCache);
+      if (warningMessage) {
+        Object(__WEBPACK_IMPORTED_MODULE_2__utils_warning__["a" /* default */])(warningMessage);
+      }
+    }
+
+    var hasChanged = false;
+    var nextState = {};
+    for (var _i = 0; _i < finalReducerKeys.length; _i++) {
+      var _key = finalReducerKeys[_i];
+      var reducer = finalReducers[_key];
+      var previousStateForKey = state[_key];
+      var nextStateForKey = reducer(previousStateForKey, action);
+      if (typeof nextStateForKey === 'undefined') {
+        var errorMessage = getUndefinedStateErrorMessage(_key, action);
+        throw new Error(errorMessage);
+      }
+      nextState[_key] = nextStateForKey;
+      hasChanged = hasChanged || nextStateForKey !== previousStateForKey;
+    }
+    return hasChanged ? nextState : state;
+  };
+}
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__("./node_modules/process/browser.js")))
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/compose.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (immutable) */ __webpack_exports__["a"] = compose;
+/**
+ * Composes single-argument functions from right to left. The rightmost
+ * function can take multiple arguments as it provides the signature for
+ * the resulting composite function.
+ *
+ * @param {...Function} funcs The functions to compose.
+ * @returns {Function} A function obtained by composing the argument functions
+ * from right to left. For example, compose(f, g, h) is identical to doing
+ * (...args) => f(g(h(...args))).
+ */
+
+function compose() {
+  for (var _len = arguments.length, funcs = Array(_len), _key = 0; _key < _len; _key++) {
+    funcs[_key] = arguments[_key];
+  }
+
+  if (funcs.length === 0) {
+    return function (arg) {
+      return arg;
+    };
+  }
+
+  if (funcs.length === 1) {
+    return funcs[0];
+  }
+
+  return funcs.reduce(function (a, b) {
+    return function () {
+      return a(b.apply(undefined, arguments));
+    };
+  });
+}
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/createStore.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return ActionTypes; });
+/* harmony export (immutable) */ __webpack_exports__["b"] = createStore;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_lodash_es_isPlainObject__ = __webpack_require__("./node_modules/lodash-es/isPlainObject.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_symbol_observable__ = __webpack_require__("./node_modules/symbol-observable/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_symbol_observable___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_symbol_observable__);
+
+
+
+/**
+ * These are private action types reserved by Redux.
+ * For any unknown actions, you must return the current state.
+ * If the current state is undefined, you must return the initial state.
+ * Do not reference these action types directly in your code.
+ */
+var ActionTypes = {
+  INIT: '@@redux/INIT'
+
+  /**
+   * Creates a Redux store that holds the state tree.
+   * The only way to change the data in the store is to call `dispatch()` on it.
+   *
+   * There should only be a single store in your app. To specify how different
+   * parts of the state tree respond to actions, you may combine several reducers
+   * into a single reducer function by using `combineReducers`.
+   *
+   * @param {Function} reducer A function that returns the next state tree, given
+   * the current state tree and the action to handle.
+   *
+   * @param {any} [preloadedState] The initial state. You may optionally specify it
+   * to hydrate the state from the server in universal apps, or to restore a
+   * previously serialized user session.
+   * If you use `combineReducers` to produce the root reducer function, this must be
+   * an object with the same shape as `combineReducers` keys.
+   *
+   * @param {Function} [enhancer] The store enhancer. You may optionally specify it
+   * to enhance the store with third-party capabilities such as middleware,
+   * time travel, persistence, etc. The only store enhancer that ships with Redux
+   * is `applyMiddleware()`.
+   *
+   * @returns {Store} A Redux store that lets you read the state, dispatch actions
+   * and subscribe to changes.
+   */
+};function createStore(reducer, preloadedState, enhancer) {
+  var _ref2;
+
+  if (typeof preloadedState === 'function' && typeof enhancer === 'undefined') {
+    enhancer = preloadedState;
+    preloadedState = undefined;
+  }
+
+  if (typeof enhancer !== 'undefined') {
+    if (typeof enhancer !== 'function') {
+      throw new Error('Expected the enhancer to be a function.');
+    }
+
+    return enhancer(createStore)(reducer, preloadedState);
+  }
+
+  if (typeof reducer !== 'function') {
+    throw new Error('Expected the reducer to be a function.');
+  }
+
+  var currentReducer = reducer;
+  var currentState = preloadedState;
+  var currentListeners = [];
+  var nextListeners = currentListeners;
+  var isDispatching = false;
+
+  function ensureCanMutateNextListeners() {
+    if (nextListeners === currentListeners) {
+      nextListeners = currentListeners.slice();
+    }
+  }
+
+  /**
+   * Reads the state tree managed by the store.
+   *
+   * @returns {any} The current state tree of your application.
+   */
+  function getState() {
+    return currentState;
+  }
+
+  /**
+   * Adds a change listener. It will be called any time an action is dispatched,
+   * and some part of the state tree may potentially have changed. You may then
+   * call `getState()` to read the current state tree inside the callback.
+   *
+   * You may call `dispatch()` from a change listener, with the following
+   * caveats:
+   *
+   * 1. The subscriptions are snapshotted just before every `dispatch()` call.
+   * If you subscribe or unsubscribe while the listeners are being invoked, this
+   * will not have any effect on the `dispatch()` that is currently in progress.
+   * However, the next `dispatch()` call, whether nested or not, will use a more
+   * recent snapshot of the subscription list.
+   *
+   * 2. The listener should not expect to see all state changes, as the state
+   * might have been updated multiple times during a nested `dispatch()` before
+   * the listener is called. It is, however, guaranteed that all subscribers
+   * registered before the `dispatch()` started will be called with the latest
+   * state by the time it exits.
+   *
+   * @param {Function} listener A callback to be invoked on every dispatch.
+   * @returns {Function} A function to remove this change listener.
+   */
+  function subscribe(listener) {
+    if (typeof listener !== 'function') {
+      throw new Error('Expected listener to be a function.');
+    }
+
+    var isSubscribed = true;
+
+    ensureCanMutateNextListeners();
+    nextListeners.push(listener);
+
+    return function unsubscribe() {
+      if (!isSubscribed) {
+        return;
+      }
+
+      isSubscribed = false;
+
+      ensureCanMutateNextListeners();
+      var index = nextListeners.indexOf(listener);
+      nextListeners.splice(index, 1);
+    };
+  }
+
+  /**
+   * Dispatches an action. It is the only way to trigger a state change.
+   *
+   * The `reducer` function, used to create the store, will be called with the
+   * current state tree and the given `action`. Its return value will
+   * be considered the **next** state of the tree, and the change listeners
+   * will be notified.
+   *
+   * The base implementation only supports plain object actions. If you want to
+   * dispatch a Promise, an Observable, a thunk, or something else, you need to
+   * wrap your store creating function into the corresponding middleware. For
+   * example, see the documentation for the `redux-thunk` package. Even the
+   * middleware will eventually dispatch plain object actions using this method.
+   *
+   * @param {Object} action A plain object representing “what changed”. It is
+   * a good idea to keep actions serializable so you can record and replay user
+   * sessions, or use the time travelling `redux-devtools`. An action must have
+   * a `type` property which may not be `undefined`. It is a good idea to use
+   * string constants for action types.
+   *
+   * @returns {Object} For convenience, the same action object you dispatched.
+   *
+   * Note that, if you use a custom middleware, it may wrap `dispatch()` to
+   * return something else (for example, a Promise you can await).
+   */
+  function dispatch(action) {
+    if (!Object(__WEBPACK_IMPORTED_MODULE_0_lodash_es_isPlainObject__["a" /* default */])(action)) {
+      throw new Error('Actions must be plain objects. ' + 'Use custom middleware for async actions.');
+    }
+
+    if (typeof action.type === 'undefined') {
+      throw new Error('Actions may not have an undefined "type" property. ' + 'Have you misspelled a constant?');
+    }
+
+    if (isDispatching) {
+      throw new Error('Reducers may not dispatch actions.');
+    }
+
+    try {
+      isDispatching = true;
+      currentState = currentReducer(currentState, action);
+    } finally {
+      isDispatching = false;
+    }
+
+    var listeners = currentListeners = nextListeners;
+    for (var i = 0; i < listeners.length; i++) {
+      var listener = listeners[i];
+      listener();
+    }
+
+    return action;
+  }
+
+  /**
+   * Replaces the reducer currently used by the store to calculate the state.
+   *
+   * You might need this if your app implements code splitting and you want to
+   * load some of the reducers dynamically. You might also need this if you
+   * implement a hot reloading mechanism for Redux.
+   *
+   * @param {Function} nextReducer The reducer for the store to use instead.
+   * @returns {void}
+   */
+  function replaceReducer(nextReducer) {
+    if (typeof nextReducer !== 'function') {
+      throw new Error('Expected the nextReducer to be a function.');
+    }
+
+    currentReducer = nextReducer;
+    dispatch({ type: ActionTypes.INIT });
+  }
+
+  /**
+   * Interoperability point for observable/reactive libraries.
+   * @returns {observable} A minimal observable of state changes.
+   * For more information, see the observable proposal:
+   * https://github.com/tc39/proposal-observable
+   */
+  function observable() {
+    var _ref;
+
+    var outerSubscribe = subscribe;
+    return _ref = {
+      /**
+       * The minimal observable subscription method.
+       * @param {Object} observer Any object that can be used as an observer.
+       * The observer object should have a `next` method.
+       * @returns {subscription} An object with an `unsubscribe` method that can
+       * be used to unsubscribe the observable from the store, and prevent further
+       * emission of values from the observable.
+       */
+      subscribe: function subscribe(observer) {
+        if (typeof observer !== 'object') {
+          throw new TypeError('Expected the observer to be an object.');
+        }
+
+        function observeState() {
+          if (observer.next) {
+            observer.next(getState());
+          }
+        }
+
+        observeState();
+        var unsubscribe = outerSubscribe(observeState);
+        return { unsubscribe: unsubscribe };
+      }
+    }, _ref[__WEBPACK_IMPORTED_MODULE_1_symbol_observable___default.a] = function () {
+      return this;
+    }, _ref;
+  }
+
+  // When a store is created, an "INIT" action is dispatched so that every
+  // reducer returns their initial state. This effectively populates
+  // the initial state tree.
+  dispatch({ type: ActionTypes.INIT });
+
+  return _ref2 = {
+    dispatch: dispatch,
+    subscribe: subscribe,
+    getState: getState,
+    replaceReducer: replaceReducer
+  }, _ref2[__WEBPACK_IMPORTED_MODULE_1_symbol_observable___default.a] = observable, _ref2;
+}
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__createStore__ = __webpack_require__("./node_modules/redux/es/createStore.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__combineReducers__ = __webpack_require__("./node_modules/redux/es/combineReducers.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__bindActionCreators__ = __webpack_require__("./node_modules/redux/es/bindActionCreators.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__applyMiddleware__ = __webpack_require__("./node_modules/redux/es/applyMiddleware.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__compose__ = __webpack_require__("./node_modules/redux/es/compose.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__utils_warning__ = __webpack_require__("./node_modules/redux/es/utils/warning.js");
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "c", function() { return __WEBPACK_IMPORTED_MODULE_0__createStore__["b"]; });
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return __WEBPACK_IMPORTED_MODULE_1__combineReducers__["a"]; });
+/* unused harmony reexport bindActionCreators */
+/* harmony reexport (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return __WEBPACK_IMPORTED_MODULE_3__applyMiddleware__["a"]; });
+/* unused harmony reexport compose */
+
+
+
+
+
+
+
+/*
+* This is a dummy function to check if the function name has been altered by minification.
+* If the function has been minified and NODE_ENV !== 'production', warn the user.
+*/
+function isCrushed() {}
+
+if (process.env.NODE_ENV !== 'production' && typeof isCrushed.name === 'string' && isCrushed.name !== 'isCrushed') {
+  Object(__WEBPACK_IMPORTED_MODULE_5__utils_warning__["a" /* default */])('You are currently using minified code outside of NODE_ENV === \'production\'. ' + 'This means that you are running a slower development build of Redux. ' + 'You can use loose-envify (https://github.com/zertosh/loose-envify) for browserify ' + 'or DefinePlugin for webpack (http://stackoverflow.com/questions/30030031) ' + 'to ensure you have the correct code for your production build.');
+}
+
+
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__("./node_modules/process/browser.js")))
+
+/***/ }),
+
+/***/ "./node_modules/redux/es/utils/warning.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (immutable) */ __webpack_exports__["a"] = warning;
+/**
+ * Prints a warning in the console if it exists.
+ *
+ * @param {String} message The warning message.
+ * @returns {void}
+ */
+function warning(message) {
+  /* eslint-disable no-console */
+  if (typeof console !== 'undefined' && typeof console.error === 'function') {
+    console.error(message);
+  }
+  /* eslint-enable no-console */
+  try {
+    // This error was thrown as a convenience so that if you enable
+    // "break on all exceptions" in your console,
+    // it would pause the execution at this line.
+    throw new Error(message);
+    /* eslint-disable no-empty */
+  } catch (e) {}
+  /* eslint-enable no-empty */
+}
+
+/***/ }),
+
+/***/ "./node_modules/symbol-observable/index.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__("./node_modules/symbol-observable/lib/index.js");
+
+/***/ }),
+
+/***/ "./node_modules/symbol-observable/lib/index.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global, module) {
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _ponyfill = __webpack_require__("./node_modules/symbol-observable/lib/ponyfill.js");
+
+var _ponyfill2 = _interopRequireDefault(_ponyfill);
+
+function _interopRequireDefault(obj) {
+  return obj && obj.__esModule ? obj : { 'default': obj };
+}
+
+var root; /* global window */
+
+if (typeof self !== 'undefined') {
+  root = self;
+} else if (typeof window !== 'undefined') {
+  root = window;
+} else if (typeof global !== 'undefined') {
+  root = global;
+} else if (true) {
+  root = module;
+} else {
+  root = Function('return this')();
+}
+
+var result = (0, _ponyfill2['default'])(root);
+exports['default'] = result;
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__("./node_modules/webpack/buildin/global.js"), __webpack_require__("./node_modules/webpack/buildin/module.js")(module)))
+
+/***/ }),
+
+/***/ "./node_modules/symbol-observable/lib/ponyfill.js":
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports['default'] = symbolObservablePonyfill;
+function symbolObservablePonyfill(root) {
+	var result;
+	var _Symbol = root.Symbol;
+
+	if (typeof _Symbol === 'function') {
+		if (_Symbol.observable) {
+			result = _Symbol.observable;
+		} else {
+			result = _Symbol('observable');
+			_Symbol.observable = result;
+		}
+	} else {
+		result = '@@observable';
+	}
+
+	return result;
+};
+
+/***/ }),
+
 /***/ "./node_modules/webpack/buildin/global.js":
 /***/ (function(module, exports) {
 
@@ -11243,11 +15984,195 @@ module.exports = function (module) {
 
 /***/ }),
 
-/***/ "./src/components/counter/counter.css":
+/***/ "./src/actions/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__store__ = __webpack_require__("./src/store/index.js");
+
+
+let nextTodoId = 0;
+
+const addTodo = text => {
+  return {
+    type: 'ADD_TODO',
+    id: nextTodoId++,
+    text
+  };
+};
+/* unused harmony export addTodo */
+
+
+const setVisibilityFilter = filter => {
+  return {
+    type: 'SET_VISIBILITY_FILTER',
+    filter
+  };
+};
+/* unused harmony export setVisibilityFilter */
+
+
+const toggleTodo = id => {
+  return __WEBPACK_IMPORTED_MODULE_0__store__["a" /* default */].dispatch({
+    type: 'TOGGLE_TODO',
+    id
+  });
+};
+/* harmony export (immutable) */ __webpack_exports__["a"] = toggleTodo;
+
+
+/***/ }),
+
+/***/ "./src/components/todo-list/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__utilities__ = __webpack_require__("./src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pwet_idom__ = __webpack_require__("./node_modules/pwet-idom/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pwet__ = __webpack_require__("../../src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pwet_src_definitions_shadow__ = __webpack_require__("../../src/definitions/shadow.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__store__ = __webpack_require__("./src/store/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__actions__ = __webpack_require__("./src/actions/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__todo_list_styl__ = __webpack_require__("./src/components/todo-list/todo-list.styl");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__todo_list_styl___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_7__todo_list_styl__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__todo_list__ = __webpack_require__("./src/components/todo-list/todo-list.js");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (Object(__WEBPACK_IMPORTED_MODULE_2_pwet__["b" /* defineComponent */])([__WEBPACK_IMPORTED_MODULE_8__todo_list__["a" /* default */], __WEBPACK_IMPORTED_MODULE_1_pwet_idom__["a" /* default */], __WEBPACK_IMPORTED_MODULE_3_pwet_src_definitions_shadow__["a" /* default */], // <- uncomment to add shadow root
+Object(__WEBPACK_IMPORTED_MODULE_0__utilities__["a" /* default */])({
+  store: __WEBPACK_IMPORTED_MODULE_5__store__["a" /* default */],
+  updateState: state => ({
+    todos: state.todos,
+    whenTodoClicked: __WEBPACK_IMPORTED_MODULE_6__actions__["a" /* toggleTodo */]
+  })
+})]));
+
+//export default TodoListDefinition(
+//  Object.assign(TodoList, {
+//    verbose: true,
+//    style,
+//    store,
+//    updateState: (state) => ({
+//      todos: state.todos,
+//      whenTodoClicked: toggleTodo
+//    })
+//  })
+//);
+
+/***/ }),
+
+/***/ "./src/components/todo-list/todo-list.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_idom_util__ = __webpack_require__("./node_modules/idom-util/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pwet_idom__ = __webpack_require__("./node_modules/pwet-idom/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
+
+
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
+
+
+
+
+
+const TodoList = {};
+
+TodoList.hooks = {};
+
+TodoList.hooks.render = ({ element: { todos, whenTodoClicked }, definition: { style } }) => {
+
+  Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["renderStyle"])(style);
+
+  Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["renderUl"])(() => {
+
+    todos.forEach(todo => {
+
+      Object(__WEBPACK_IMPORTED_MODULE_1_pwet_idom__["b" /* renderComponent */])('x-todo', todo.id, [], ...Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["transformObjectToArray"])(_extends({}, todo, {
+        whenClicked: () => whenTodoClicked(todo.id)
+      })));
+    });
+  });
+};
+
+TodoList.tagName = 'x-todo-list';
+
+TodoList.attributes = {
+  'data-todos': ({ element }, value) => {
+
+    try {
+      return { todos: JSON.parse(value) };
+    } catch (err) {}
+  }
+};
+
+TodoList.properties = {
+  todos: ({ element }, value = []) => {
+
+    const _setValue = input => {
+      console.log('set todos', input);
+
+      if (Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["k" /* isString */])(input)) try {
+        input = JSON.parse(input);
+      } catch (err) {
+        console.error(err.stack);
+        return;
+      }
+
+      if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["b" /* isArray */])(input)) return;
+
+      for (let todo of input) {
+
+        if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["i" /* isObject */])(todo)) return;
+        if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["k" /* isString */])(todo.id) || Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["e" /* isEmpty */])(todo.id)) return;
+
+        todo.completed = !!todo.completed;
+
+        if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["k" /* isString */])(todo.text)) todo.text = '';
+      }
+
+      value = input;
+    };
+
+    _setValue(element.getAttribute('data-todos'));
+
+    return {
+      get: () => value,
+      set: _setValue
+    };
+  },
+  whenTodoClicked: (component, value = __WEBPACK_IMPORTED_MODULE_2_pwet_src_utilities__["d" /* noop */]) => ({
+    get: () => value,
+    set: newValue => {
+      if (Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["g" /* isFunction */])(newValue)) value = newValue;
+    }
+  })
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (TodoList);
+
+/***/ }),
+
+/***/ "./src/components/todo-list/todo-list.styl":
 /***/ (function(module, exports, __webpack_require__) {
 
 
-        var result = __webpack_require__("./node_modules/css-loader/index.js!./src/components/counter/counter.css");
+        var result = __webpack_require__("./node_modules/css-loader/index.js!./node_modules/stylus-loader/index.js!./src/components/todo-list/todo-list.styl");
 
         if (typeof result === "string") {
             module.exports = result;
@@ -11258,122 +16183,99 @@ module.exports = function (module) {
 
 /***/ }),
 
-/***/ "./src/components/counter/counter.js":
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__counter_css__ = __webpack_require__("./src/components/counter/counter.css");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__counter_css___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_2__counter_css__);
-
-
-
-
-
-
-const Counter = component => {
-
-  const { element, hooks } = component;
-
-  let _addButton;
-  let _removeButton;
-  let _counterSpan;
-
-  const _add = () => element.start += element.by;
-  const _remove = () => element.start -= element.by;
-
-  hooks.attach = () => {
-
-    _addButton.addEventListener('click', _add);
-    _removeButton.addEventListener('click', _remove);
-  };
-
-  hooks.detach = () => {
-
-    _addButton.removeEventListener('click', _add);
-    _removeButton.removeEventListener('click', _remove);
-  };
-
-  hooks.render = component => {
-
-    console.warn('Counter.render()', component);
-
-    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["m" /* isUndefined */])(_removeButton)) {
-      _removeButton = document.createElement('button');
-      _removeButton.textContent = '-';
-      component.root.appendChild(_removeButton);
-    }
-
-    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["m" /* isUndefined */])(_counterSpan)) {
-      _counterSpan = document.createElement('span');
-      _counterSpan.style.padding = '0 10px';
-      component.root.appendChild(_counterSpan);
-    }
-
-    _counterSpan.textContent = element.start;
-
-    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["m" /* isUndefined */])(_addButton)) {
-      _addButton = document.createElement('button');
-      _addButton.textContent = '+';
-      component.root.appendChild(_addButton);
-    }
-  };
-
-  return component;
-};
-
-Counter.properties = {
-  start: ({ element }, value = element.getAttribute('data-start') || 0) => ({
-    get: () => value,
-    set: newValue => {
-
-      newValue = parseInt(newValue);
-
-      if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["h" /* isInteger */])(newValue)) value = newValue;
-    }
-  }),
-  by: ({ element }, value = element.getAttribute('data-by') || 1) => ({
-    get: () => value,
-    set: newValue => {
-
-      newValue = parseInt(newValue);
-
-      if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["h" /* isInteger */])(newValue)) value = newValue;
-    }
-  })
-};
-
-Counter.attributes = {
-  'data-start': ({ element }, value, oldValue) => {
-    return { start: value };
-  },
-  'data-by': ({ element }, value, oldValue) => {
-    return { by: value };
-  }
-};
-
-//Counter.verbose = true;
-Counter.tagName = 'x-counter';
-
-Counter.style = __WEBPACK_IMPORTED_MODULE_2__counter_css___default.a;
-
-/* harmony default export */ __webpack_exports__["a"] = (Counter);
-
-/***/ }),
-
-/***/ "./src/components/counter/index.js":
+/***/ "./src/components/todo/index.js":
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_pwet__ = __webpack_require__("../../src/index.js");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__counter__ = __webpack_require__("./src/components/counter/counter.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pwet_idom__ = __webpack_require__("./node_modules/pwet-idom/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pwet_src_definitions_shadow__ = __webpack_require__("../../src/definitions/shadow.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__todo__ = __webpack_require__("./src/components/todo/todo.js");
 
 
 
 
 
-/* unused harmony default export */ var _unused_webpack_default_export = (Object(__WEBPACK_IMPORTED_MODULE_0_pwet__["b" /* defineComponent */])([__WEBPACK_IMPORTED_MODULE_1__counter__["a" /* default */], __WEBPACK_IMPORTED_MODULE_0_pwet__["a" /* Component */]]));
+
+
+
+/* unused harmony default export */ var _unused_webpack_default_export = (Object(__WEBPACK_IMPORTED_MODULE_0_pwet__["b" /* defineComponent */])([__WEBPACK_IMPORTED_MODULE_3__todo__["a" /* default */], __WEBPACK_IMPORTED_MODULE_2_pwet_src_definitions_shadow__["a" /* default */], __WEBPACK_IMPORTED_MODULE_1_pwet_idom__["a" /* default */]]));
+
+/***/ }),
+
+/***/ "./src/components/todo/todo.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_idom_util__ = __webpack_require__("./node_modules/idom-util/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__todo_styl__ = __webpack_require__("./src/components/todo/todo.styl");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__todo_styl___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_3__todo_styl__);
+
+
+
+
+
+
+
+
+const Todo = {
+  tagName: 'x-todo',
+  style: __WEBPACK_IMPORTED_MODULE_3__todo_styl___default.a,
+  hooks: {
+    render({ element, definition: { style } }) {
+
+      const { text, whenClicked } = element;
+
+      Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["renderStyle"])(style);
+
+      Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["renderLi"])(null, null, 'onclick', whenClicked, () => {
+
+        Object(__WEBPACK_IMPORTED_MODULE_0_idom_util__["text"])(text);
+      });
+    }
+  },
+  properties: {
+    whenClicked: (component, value = __WEBPACK_IMPORTED_MODULE_1_pwet_src_utilities__["d" /* noop */]) => ({
+      get: () => value,
+      set: newValue => {
+        if (Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["g" /* isFunction */])(newValue)) value = newValue;
+      }
+    }),
+    completed: ({ element }, value = false) => ({
+      get: () => value,
+      set: newValue => {
+        value = !!newValue;
+
+        if (value) element.setAttribute('completed', '');else element.removeAttribute('completed');
+      }
+    }),
+    text: (component, value = '') => ({
+      get: () => value,
+      set: newValue => {
+        if (Object(__WEBPACK_IMPORTED_MODULE_2_kwak__["k" /* isString */])(newValue)) value = newValue;
+      }
+    })
+  }
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (Todo);
+
+/***/ }),
+
+/***/ "./src/components/todo/todo.styl":
+/***/ (function(module, exports, __webpack_require__) {
+
+
+        var result = __webpack_require__("./node_modules/css-loader/index.js!./node_modules/stylus-loader/index.js!./src/components/todo/todo.styl");
+
+        if (typeof result === "string") {
+            module.exports = result;
+        } else {
+            module.exports = result.toString();
+        }
+    
 
 /***/ }),
 
@@ -11384,7 +16286,11 @@ Counter.style = __WEBPACK_IMPORTED_MODULE_2__counter_css___default.a;
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadydom_src_shadydom__ = __webpack_require__("./node_modules/@webcomponents/shadydom/src/shadydom.js");
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__webcomponents_custom_elements_src_custom_elements__ = __webpack_require__("./node_modules/@webcomponents/custom-elements/src/custom-elements.js");
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__components_counter__ = __webpack_require__("./src/components/counter/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__components_todo__ = __webpack_require__("./src/components/todo/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__components_todo_list__ = __webpack_require__("./src/components/todo-list/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__store__ = __webpack_require__("./src/store/index.js");
+
+
 
 
 
@@ -11393,31 +16299,178 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  console.log('Creating...');
-  const counter5 = document.createElement('x-counter');
-  counter5.id = 'counter5';
-  const counter6 = document.createElement('x-counter');
-  counter6.id = 'counter6';
-  const counter7 = document.createElement('x-counter');
-  counter7.id = 'counter7';
-  const counter8 = document.createElement('x-counter');
-  counter8.id = 'counter8';
+  document.body.appendChild(document.createElement('x-todo-list'));
 
-  console.log('Attaching...');
-
-  // Attach
-  document.getElementById('no-state').appendChild(counter5);
-  document.getElementById('property').appendChild(counter6);
-  document.getElementById('attribute').appendChild(counter7);
-  document.getElementById('setter').appendChild(counter8);
-
-  console.log('Updating...');
-
-  counter6.start = 1000;
-  counter7.setAttribute('data-start', '1000');
-  counter7.setAttribute('data-by', '2');
-  counter8.properties = { by: 4, start: 42 };
+  __WEBPACK_IMPORTED_MODULE_4__store__["a" /* default */].dispatch({ type: '@@INIT' });
 });
+
+/***/ }),
+
+/***/ "./src/store/enhancers.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_redux__ = __webpack_require__("./node_modules/redux/es/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_redux_logger__ = __webpack_require__("./node_modules/redux-logger/dist/redux-logger.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_redux_logger___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_redux_logger__);
+
+
+
+/* harmony default export */ __webpack_exports__["a"] = (Object(__WEBPACK_IMPORTED_MODULE_0_redux__["a" /* applyMiddleware */])(__WEBPACK_IMPORTED_MODULE_1_redux_logger___default.a));
+
+/***/ }),
+
+/***/ "./src/store/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_redux__ = __webpack_require__("./node_modules/redux/es/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__reducers__ = __webpack_require__("./src/store/reducers/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__enhancers__ = __webpack_require__("./src/store/enhancers.js");
+
+
+
+
+/* harmony default export */ __webpack_exports__["a"] = (Object(__WEBPACK_IMPORTED_MODULE_0_redux__["c" /* createStore */])(__WEBPACK_IMPORTED_MODULE_1__reducers__["a" /* default */], __WEBPACK_IMPORTED_MODULE_2__enhancers__["a" /* default */]));
+
+/***/ }),
+
+/***/ "./src/store/reducers/index.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_redux__ = __webpack_require__("./node_modules/redux/es/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__todos__ = __webpack_require__("./src/store/reducers/todos.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__visibilityFilter__ = __webpack_require__("./src/store/reducers/visibilityFilter.js");
+
+
+
+
+/* harmony default export */ __webpack_exports__["a"] = (Object(__WEBPACK_IMPORTED_MODULE_0_redux__["b" /* combineReducers */])({
+  todos: __WEBPACK_IMPORTED_MODULE_1__todos__["a" /* default */],
+  visibilityFilter: __WEBPACK_IMPORTED_MODULE_2__visibilityFilter__["a" /* default */]
+}));
+
+/***/ }),
+
+/***/ "./src/store/reducers/todos.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
+const _initialState = [{ id: '1', text: 'Count to infinity twice', completed: true }, { id: '2', text: 'Save the world', completed: false }];
+
+const todos = (state = _initialState, action) => {
+  switch (action.type) {
+    case 'ADD_TODO':
+      return [...state, {
+        id: action.id,
+        text: action.text,
+        completed: false
+      }];
+    case 'TOGGLE_TODO':
+      return state.map(todo => todo.id === action.id ? _extends({}, todo, { completed: !todo.completed }) : todo);
+    default:
+      return state;
+  }
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (todos);
+
+/***/ }),
+
+/***/ "./src/store/reducers/visibilityFilter.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+const visibilityFilter = (state = 'SHOW_ALL', action) => {
+  switch (action.type) {
+    case 'SET_VISIBILITY_FILTER':
+      return action.filter;
+    default:
+      return state;
+  }
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (visibilityFilter);
+
+/***/ }),
+
+/***/ "./src/utilities.js":
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_kwak__ = __webpack_require__("../../node_modules/kwak/lib/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_idom_util__ = __webpack_require__("./node_modules/idom-util/src/index.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2_pwet_src_definition__ = __webpack_require__("../../src/definition.js");
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3_pwet_src_utilities__ = __webpack_require__("../../src/utilities.js");
+
+
+
+
+
+const _reduxMethods = ['getState', 'dispatch', 'subscribe'];
+
+const ReduxDefinition = (definition = {}) => {
+
+  const { updateState, actions = {}, store } = definition;
+
+  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["i" /* isObject */])(store) && _reduxMethods.every(key => Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["g" /* isFunction */])(store[key])), `'store' must be a Redux store`);
+
+  const _subscribers = new Map();
+
+  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["j" /* isPlainObject */])(actions), `'actions' must be a plain object`);
+  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["g" /* isFunction */])(updateState), `'update' must be a function`);
+
+  const actionsKeys = Object.keys(actions);
+
+  actionsKeys.forEach(key => {
+    Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["g" /* isFunction */])(actions[key]), `'${key}' must be a function`);
+  });
+
+  const ReduxComponent = component => {
+
+    const { hooks } = component;
+
+    hooks.attach = Object(__WEBPACK_IMPORTED_MODULE_3_pwet_src_utilities__["b" /* decorate */])(hooks.attach, (next, component) => {
+
+      next(component);
+
+      const { element, update } = component;
+
+      const unsubscribe = store.subscribe(() => {
+
+        const state = store.getState();
+
+        update(updateState(state), { partial: true });
+
+        element.dispatchEvent(new CustomEvent('state-changed', {
+          detail: state
+        }));
+      });
+
+      _subscribers.set(element, unsubscribe);
+    });
+
+    hooks.detach = Object(__WEBPACK_IMPORTED_MODULE_3_pwet_src_utilities__["b" /* decorate */])(hooks.detach, (next, component) => {
+
+      next(component);
+
+      const unsubscribe = _subscribers.get(component.element);
+
+      unsubscribe();
+    });
+
+    return component;
+  };
+
+  definition = Object.assign(ReduxComponent, definition);
+
+  return definition;
+};
+
+/* harmony default export */ __webpack_exports__["a"] = (ReduxDefinition);
 
 /***/ })
 

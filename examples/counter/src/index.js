@@ -1,29 +1,32 @@
 'use strict';
-
+import '@webcomponents/shadydom/src/shadydom';
+import '@webcomponents/custom-elements/src/custom-elements';
 import './components/counter';
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  //Component.define(Counter);
+  console.log('Creating...');
+  const counter5 = document.createElement('x-counter');
+  counter5.id = 'counter5';
+  const counter6 = document.createElement('x-counter');
+  counter6.id = 'counter6';
+  const counter7 = document.createElement('x-counter');
+  counter7.id = 'counter7';
+  const counter8 = document.createElement('x-counter');
+  counter8.id = 'counter8';
 
-  const noState = document.getElementById('no-state');
-  const property = document.getElementById('property');
-  const attribute = document.getElementById('attribute');
-  const dataset = document.getElementById('dataset');
+  console.log('Attaching...');
 
-  const counter1 = document.createElement('x-counter');
-  const counter2 = document.createElement('x-counter');
-  const counter3 = document.createElement('x-counter');
-  const counter4 = document.createElement('x-counter');
+  // Attach
+  document.getElementById('no-state').appendChild(counter5);
+  document.getElementById('property').appendChild(counter6);
+  document.getElementById('attribute').appendChild(counter7);
+  document.getElementById('setter').appendChild(counter8);
 
-  counter2.start = 1000;
-  counter3.setAttribute('data-start', '1000');
-  counter4.dataset.start = 1000;
+  console.log('Updating...');
 
-
-  noState.appendChild(counter1);
-  property.appendChild(counter2);
-  attribute.appendChild(counter3);
-  dataset.appendChild(counter4);
-
+  counter6.start = 1000;
+  counter7.setAttribute('data-start', '1000');
+  counter7.setAttribute('data-by', '2');
+  counter8.properties = { by: 4, start: 42 };
 });

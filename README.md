@@ -17,7 +17,7 @@ git clone https://github.com/Gastonite/pwet
   ```
 - if you are using npm :
   ```
-  npm i && cd examples/{name} && npm i && yarn run dev
+  npm i && cd examples/{name} && npm i && npm run dev
   ```
 
 3. Now the demo is visible at [http://localhost:3000](http://localhost:3000)

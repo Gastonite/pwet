@@ -11,10 +11,8 @@ export const noop = () => {};
 export const identity = arg => arg;
 export const toggle = input => !input;
 export const not = fn => (...args) => !fn(...args);
-export const isAttached = (element, container = document) => {
+export const isAttached = (element, container = document) => container.contains(element);
 
-  return container.contains(element);
-};
 
 export const decorate = (before, ...decorators) => {
 

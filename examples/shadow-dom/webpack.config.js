@@ -45,9 +45,10 @@ module.exports = (env) => {
   const module = {
     loaders: [
       {test: /\.js$/, use: 'babel-loader'},
-      {test: /\.css/, use: [
+      {test: /\.styl$/, use: [
         'to-string-loader',
-        'css-loader'
+        'css-loader',
+        'stylus-loader'
       ]}
     ]
   };
@@ -78,8 +79,7 @@ module.exports = (env) => {
       }
     })
   );
-
-
+  //
   const resolve = {
     alias: {
       pwet: Path.resolve(__dirname, '../..')
