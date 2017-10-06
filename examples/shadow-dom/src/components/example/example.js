@@ -8,6 +8,7 @@ const Example = {};
 Example.hooks = {};
 Example.hooks.render = ({ root, element, definition: { style } }) => {
 
+  console.error('RENDER')
   const { isVisible, color } = element;
 
   root.innerHTML = `<style>${style}</style><div>${isVisible ? 'visible' : ''}</div>`;

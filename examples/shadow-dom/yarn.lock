@@ -3082,9 +3082,9 @@ punycode@^1.2.4, punycode@^1.4.1:
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-1.4.1.tgz#c0d5a63b2718800ad8e1eb0fa5269c84dd41845e"
 
-pwet-idom@^0.1.4:
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/pwet-idom/-/pwet-idom-0.1.4.tgz#708aa3ef407a0633f561e057148e8254ca01cd2f"
+pwet-idom@^0.1.5:
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/pwet-idom/-/pwet-idom-0.1.5.tgz#f28ec1d42a7a4f04ab5bc7035a16b81ca5b73700"
   dependencies:
     idom-util "^1.0.4"
     lodash.debounce "^4.0.8"

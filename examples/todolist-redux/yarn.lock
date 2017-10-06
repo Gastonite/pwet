@@ -582,8 +582,8 @@ caniuse-api@^1.5.2:
     lodash.uniq "^4.5.0"
 
 caniuse-db@^1.0.30000529, caniuse-db@^1.0.30000634, caniuse-db@^1.0.30000639:
-  version "1.0.30000743"
-  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000743.tgz#bc8df2a257cf91ba024322266295af3ded852306"
+  version "1.0.30000744"
+  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000744.tgz#00758ff7dd5f7138d34a15608dccf71a59656ffe"
 
 caseless@~0.12.0:
   version "0.12.0"
@@ -3090,9 +3090,9 @@ punycode@^1.2.4, punycode@^1.4.1:
   version "1.4.1"
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-1.4.1.tgz#c0d5a63b2718800ad8e1eb0fa5269c84dd41845e"
 
-pwet-idom@^0.1.4:
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/pwet-idom/-/pwet-idom-0.1.4.tgz#708aa3ef407a0633f561e057148e8254ca01cd2f"
+pwet-idom@^0.1.5:
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/pwet-idom/-/pwet-idom-0.1.5.tgz#f28ec1d42a7a4f04ab5bc7035a16b81ca5b73700"
   dependencies:
     idom-util "^1.0.4"
     lodash.debounce "^4.0.8"

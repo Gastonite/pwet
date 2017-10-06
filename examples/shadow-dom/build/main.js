@@ -60,7 +60,7 @@
 /******/ 	
 /******/ 	
 /******/ 	var hotApplyOnUpdate = true;
-/******/ 	var hotCurrentHash = "9e12f0308958376bcee1"; // eslint-disable-line no-unused-vars
+/******/ 	var hotCurrentHash = "b4e61161e9419a6d805e"; // eslint-disable-line no-unused-vars
 /******/ 	var hotRequestTimeout = 10000;
 /******/ 	var hotCurrentModuleData = {};
 /******/ 	var hotCurrentChildModule; // eslint-disable-line no-unused-vars
@@ -1756,7 +1756,7 @@ const isDeeplyEqual = __WEBPACK_IMPORTED_MODULE_0_lodash_isequal___default.a;
 /* harmony export (immutable) */ __webpack_exports__["c"] = isDeeplyEqual;
 
 const isEqualTo = (value, input) => input === value;
-/* harmony export (immutable) */ __webpack_exports__["f"] = isEqualTo;
+/* harmony export (immutable) */ __webpack_exports__["e"] = isEqualTo;
 
 const isTrue = input => isEqualTo(true, input);
 /* unused harmony export isTrue */
@@ -1783,7 +1783,7 @@ const isPlainObject = __WEBPACK_IMPORTED_MODULE_1_lodash_isplainobject___default
 /* harmony export (immutable) */ __webpack_exports__["j"] = isPlainObject;
 
 const isEmpty = input => input.length < 1;
-/* harmony export (immutable) */ __webpack_exports__["e"] = isEmpty;
+/* harmony export (immutable) */ __webpack_exports__["d"] = isEmpty;
 
 const isBoolean = input => isOfType('boolean', input);
 /* unused harmony export isBoolean */
@@ -1795,7 +1795,7 @@ const isString = input => {
 /* harmony export (immutable) */ __webpack_exports__["k"] = isString;
 
 const isFunction = input => isOfType('function', input) && input;
-/* harmony export (immutable) */ __webpack_exports__["g"] = isFunction;
+/* harmony export (immutable) */ __webpack_exports__["f"] = isFunction;
 
 const isNumber = input => isOfType('number', input);
 /* unused harmony export isNumber */
@@ -1807,10 +1807,10 @@ const isComponent = input => isObject(input) && input.isPwetComponent === true;
 /* unused harmony export isComponent */
 
 const isHTMLElement = input => isInstanceOf(HTMLElement, input);
-/* unused harmony export isHTMLElement */
+/* harmony export (immutable) */ __webpack_exports__["g"] = isHTMLElement;
 
 const isElement = input => isHTMLElement(input) && input.nodeType === 1;
-/* harmony export (immutable) */ __webpack_exports__["d"] = isElement;
+/* unused harmony export isElement */
 
 const isUnknownElement = input => Object.prototype.toString.call(input) === '[object HTMLUnknownElement]';
 /* unused harmony export isUnknownElement */
@@ -6545,15 +6545,22 @@ module.exports = _curry1(_checkForMethod('tail', slice(1, Infinity)));
 const Component = (component = {}) => {
 
   const { element, hooks, root } = component;
-  let { tagName, properties = {}, attributes = {}, verbose } = component.definition;
+  let { tagName, properties = {}, attributes = {}, updaters = {}, verbose } = component.definition;
   let _isAttached = false;
   let _isRendered = false;
   let _isUpdating = false;
   let _properties;
 
-  if (verbose) console.log(`<${tagName}>`, 'detach', { _isAttached, _isRendered });
+  if (verbose) console.log(`<${tagName}>`, 'Component()', { updaters, _isAttached, _isRendered });
 
   if (!root) component.root = element;
+
+  component.updaters = Object.keys(updaters).reduce((before, key) => {
+
+    return Object.assign(before, {
+      [key]: updaters[key].bind(null, component)
+    });
+  }, {});
 
   const _attributesNames = Object.keys(attributes);
 
@@ -6616,7 +6623,7 @@ const Component = (component = {}) => {
 
   component.render = () => {
 
-    if (verbose) console.log(`<${tagName}>`, 'render()', { _isAttached, _isRendered, properties: JSON.stringify(_properties), state: JSON.stringify(component.state) });
+    if (verbose) console.log(`<${tagName}>`, 'render()', Object.assign({}, _properties));
 
     if (!_isAttached) return;
 
@@ -6685,7 +6692,7 @@ const Component = (component = {}) => {
   component.update(_properties, _properties);
 
   // Use of MutationObserver instead of observedAttributes because MutationObserver callback is debounced.
-  const _attributeObserver = Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["e" /* isEmpty */])(attributes) ? null : new MutationObserver(mutations => {
+  const _attributeObserver = Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["d" /* isEmpty */])(attributes) ? null : new MutationObserver(mutations => {
 
     if (component.isUpdating) return;
 
@@ -6693,9 +6700,9 @@ const Component = (component = {}) => {
       name,
       oldValue,
       value: element.getAttribute(name)
-    })).filter(({ value, oldValue }) => !Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["f" /* isEqualTo */])(value, oldValue));
+    })).filter(({ value, oldValue }) => !Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["e" /* isEqualTo */])(value, oldValue));
 
-    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["e" /* isEmpty */])(mutations)) return;
+    if (Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["d" /* isEmpty */])(mutations)) return;
 
     if (verbose) console.log(`<${tagName}>`, 'attributesChanged', mutations.map(({ name, value }) => `${name}=${value}`));
 
@@ -6720,6 +6727,15 @@ const Component = (component = {}) => {
   });
 
   return component;
+};
+
+Component.hooks = {
+  create: Component,
+  attach: __WEBPACK_IMPORTED_MODULE_2__utilities__["d" /* noop */],
+  detach: __WEBPACK_IMPORTED_MODULE_2__utilities__["d" /* noop */],
+  render: __WEBPACK_IMPORTED_MODULE_2__utilities__["d" /* noop */],
+  define: __WEBPACK_IMPORTED_MODULE_2__utilities__["c" /* identity */],
+  update: (component, properties, oldProperties) => !component.isRendered || !Object(__WEBPACK_IMPORTED_MODULE_1_kwak__["c" /* isDeeplyEqual */])(properties, oldProperties)
 };
 
 /* harmony default export */ __webpack_exports__["a"] = (Component);
@@ -6748,6 +6764,22 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 
 
+const _parseMethods = (input, label = 'input', defaults = input) => {
+
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(input), `'${label}' must be an object`);
+
+  Object.keys(input).forEach(key => {
+
+    const value = input[key] || defaults[key];
+
+    Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(value), `'${key}' must be a function`);
+
+    input[key] = value;
+  });
+
+  return input;
+};
+
 const _definitions = [];
 const $pwet = Symbol('__pwet');
 
@@ -6755,7 +6787,7 @@ const Definition = (definition = {}) => {
 
   if (Definition.isDefinition(definition)) return definition;
 
-  definition = Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["b" /* isArray */])(definition) ? Definition.fromArray(definition) : Definition.parseDefinition(definition);
+  definition = Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["b" /* isArray */])(definition) ? Definition.composeDefinition(definition) : Definition.parseDefinition(definition);
 
   definition.type = class extends definition.type {
     constructor() {
@@ -6787,24 +6819,21 @@ const Definition = (definition = {}) => {
   return definition;
 };
 
-Definition.fromArray = definition => {
+Definition.composeDefinition = definition => {
 
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["b" /* isArray */])(definition), `'definition' must be an array`);
-  //assert(definition.every(isFunction), `'definition' array must only contains functions`);
 
   if (!definition.includes(__WEBPACK_IMPORTED_MODULE_2__component__["a" /* default */])) definition.push(__WEBPACK_IMPORTED_MODULE_2__component__["a" /* default */]);
 
-  return Definition.parseDefinition(Object.assign(__WEBPACK_IMPORTED_MODULE_3_ramda_src_pipe___default()(...definition.filter(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])), definition.reduce((before, after) => {
+  return Definition.parseDefinition(Object.assign(__WEBPACK_IMPORTED_MODULE_3_ramda_src_pipe___default()(...definition.filter(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])), definition.reverse().reduce((before, after) => {
 
     const hooks = _extends({}, before.hooks);
 
     if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(after.hooks)) {
 
-      const hooksOverride = {};
+      Object.assign(hooks, after.hooks);
 
-      if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(before.hooks.define) && Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(after.hooks.define)) hooksOverride.define = __WEBPACK_IMPORTED_MODULE_3_ramda_src_pipe___default()(before.hooks.define, after.hooks.define);
-
-      Object.assign(hooks, after.hooks, hooksOverride);
+      if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(before.hooks.define) && Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(after.hooks.define)) hooks.define = __WEBPACK_IMPORTED_MODULE_3_ramda_src_pipe___default()(before.hooks.define, after.hooks.define);
     }
 
     return Object.assign(before, after, { hooks });
@@ -6814,9 +6843,8 @@ Definition.fromArray = definition => {
 Definition.parseDefinition = (definition = {}) => {
 
   console.log('Definition.parseDefinition()');
-  console.log('Definition.parseDefinition()');
 
-  if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(definition)) {
+  if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(definition)) {
 
     if (Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isUndefined */])(definition.tagName) && Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(definition.name)) definition.tagName = __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default()(definition.name);
 
@@ -6829,24 +6857,24 @@ Definition.parseDefinition = (definition = {}) => {
 
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(definition), `'definition' must be an object`);
 
-  const { properties = {}, hooks = {}, attributes = {}, dependencies = {}, verbose } = definition;
+  const { properties = {}, hooks = {}, updaters = {}, attributes = {}, verbose } = definition;
   let { tagName, type = HTMLElement, style = '' } = definition;
 
   // Tag
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(tagName) && !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["e" /* isEmpty */])(tagName), `'tagName' must be a non empty string`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(tagName) && !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["d" /* isEmpty */])(tagName), `'tagName' must be a non empty string`);
   tagName = __WEBPACK_IMPORTED_MODULE_0_lodash_kebabcase___default()(tagName.toLowerCase());
   if (!tagName.includes('-')) tagName = `x-${tagName}`;
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(!Definition.getDefinition(tagName), `'${tagName}' definition already exists`);
 
   // Type
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(type) && (type === HTMLElement || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["d" /* isElement */])(type.prototype)), `'type' must be a subclass of HTMLElement`);
+  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(type) && (type === HTMLElement || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isHTMLElement */])(type.prototype)), `'type' must be a subclass of HTMLElement`);
 
   // Properties
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(properties), `'properties' must be an object`);
   Object.keys(properties).forEach(key => {
     let property = properties[key];
 
-    if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(property)) {
+    if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(property)) {
 
       if (!Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["j" /* isPlainObject */])(property)) property = { value: property, writable: true };
 
@@ -6859,21 +6887,20 @@ Definition.parseDefinition = (definition = {}) => {
   Object.keys(attributes).forEach(key => {
     const attribute = attributes[key];
 
-    Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(attribute), `Invalid 'attributes': ${key}' must be a function`);
+    Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["f" /* isFunction */])(attribute), `Invalid 'attributes': ${key}' must be a function`);
   });
 
   // Style
   Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["l" /* isUndefined */])(style) || Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["k" /* isString */])(style), `'style' must be a string`);
 
   // Hooks
-  Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["i" /* isObject */])(hooks), `'hooks' must be an object`);
-  Object.keys(Definition.defaultHooks).forEach(key => {
+  _parseMethods(hooks, 'hooks');
+  console.log('define hooks=', hooks);
 
-    const hook = hooks[key] || Definition.defaultHooks[key];
-
-    Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["g" /* isFunction */])(hook), `'${key}' must be a function`);
-
-    hooks[key] = hook;
+  // Updaters
+  _parseMethods(updaters, 'updaters');
+  Object.keys(updaters).forEach(key => {
+    const updater = updaters[key];
   });
 
   return _extends({}, definition, {
@@ -6881,26 +6908,15 @@ Definition.parseDefinition = (definition = {}) => {
     type,
     properties,
     attributes,
-    dependencies,
     style,
-    verbose,
-    hooks
+    hooks,
+    updaters,
+    verbose
   });
 };
 
 Definition.getDefinition = input => _definitions.find(definition => definition.tagName === input);
 Definition.isDefinition = input => _definitions.includes(input);
-Definition.defaultHooks = {
-  create: __WEBPACK_IMPORTED_MODULE_2__component__["a" /* default */],
-  attach: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
-  detach: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
-  render: __WEBPACK_IMPORTED_MODULE_1__utilities__["d" /* noop */],
-  define: __WEBPACK_IMPORTED_MODULE_1__utilities__["c" /* identity */],
-  update: (component, properties, oldProperties) => {
-
-    return !component.isRendered || !Object(__WEBPACK_IMPORTED_MODULE_4_kwak__["c" /* isDeeplyEqual */])(properties, oldProperties);
-  }
-};
 
 
 
@@ -6929,7 +6945,7 @@ const ShadowComponent = component => {
 
   component.root = element.attachShadow({ mode: 'open' });
 
-  if (verbose) console.log('ShadowComponent()', hooks.render);
+  if (verbose) console.log('ShadowComponent()');
 
   hooks.render = Object(__WEBPACK_IMPORTED_MODULE_2__utilities__["b" /* decorate */])(hooks.render, (next, component) => {
 
@@ -6948,7 +6964,7 @@ ShadowComponent.hooks = {
 
     const { tagName, style, verbose } = definition;
 
-    if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["e" /* isEmpty */])(style) && !isShadowNative) definition.style = __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadycss_src_style_transformer__["a" /* default */].css(style, tagName);
+    if (!Object(__WEBPACK_IMPORTED_MODULE_3_kwak__["d" /* isEmpty */])(style) && !isShadowNative) definition.style = __WEBPACK_IMPORTED_MODULE_0__webcomponents_shadycss_src_style_transformer__["a" /* default */].css(style, tagName);
 
     if (verbose) console.log(`<${tagName}>`, 'ShadowComponent.define()');
 
@@ -7035,9 +7051,9 @@ const isAttached = (element, container = document) => container.contains(element
 
 const decorate = (before, ...decorators) => {
 
-  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["g" /* isFunction */])(before), `'before' must be a function`);
+  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["f" /* isFunction */])(before), `'before' must be a function`);
 
-  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(!Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["e" /* isEmpty */])(decorators) && decorators.every(__WEBPACK_IMPORTED_MODULE_0_kwak__["g" /* isFunction */]), `decorate only accepts functions as parameters`);
+  Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["a" /* assert */])(!Object(__WEBPACK_IMPORTED_MODULE_0_kwak__["d" /* isEmpty */])(decorators) && decorators.every(__WEBPACK_IMPORTED_MODULE_0_kwak__["f" /* isFunction */]), `decorate only accepts functions as parameters`);
 
   return decorators.reduce((before, fn) => fn.bind(null, before), before);
 };
@@ -15297,6 +15313,7 @@ const Example = {};
 Example.hooks = {};
 Example.hooks.render = ({ root, element, definition: { style } }) => {
 
+  console.error('RENDER');
   const { isVisible, color } = element;
 
   root.innerHTML = `<style>${style}</style><div>${isVisible ? 'visible' : ''}</div>`;
