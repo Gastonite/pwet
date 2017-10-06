@@ -1,30 +1,37 @@
 'use strict';
 
 import LodashCloneDeep from 'lodash.clonedeep';
-import { assert, isFunction, isUndefined, isObject, isNull, isEmpty, isEqualTo, isPlainObject } from 'kwak';
-import { decorate, clone } from './utilities';
+import { assert, isUndefined, isObject, isNull, isEmpty, isEqualTo, isPlainObject, isDeeplyEqual } from 'kwak';
+import { noop, identity, clone } from './utilities';
 
 const Component = (component = {}) => {
 
   const { element, hooks, root } = component;
-  let { tagName, properties = {}, attributes = {}, verbose } = component.definition;
+  let { tagName, properties = {}, attributes = {}, updaters = {}, verbose } = component.definition;
   let _isAttached = false;
   let _isRendered = false;
   let _isUpdating = false;
   let _properties;
 
   if (verbose)
-    console.log(`<${tagName}>`, 'detach', { _isAttached, _isRendered });
+    console.log(`<${tagName}>`, 'Component()', { updaters, _isAttached, _isRendered });
 
   if (!root)
     component.root = element;
 
+  component.updaters = Object.keys(updaters).reduce((before, key) => {
+
+    return Object.assign(before, {
+      [key]: updaters[key].bind(null, component)
+    });
+  }, {});
+
   const _attributesNames = Object.keys(attributes);
 
   Object.defineProperties(component, {
-    isRendered: { get: () => _isRendered  },
+    isRendered: { get: () => _isRendered },
     isUpdating: { get: () => _isUpdating },
-    isAttached: { get: () => _isAttached  }
+    isAttached: { get: () => _isAttached }
   });
 
   const _getProperties = () => {
@@ -90,7 +97,7 @@ const Component = (component = {}) => {
   component.render = () => {
 
     if (verbose)
-      console.log(`<${tagName}>`, 'render()', { _isAttached, _isRendered, properties: JSON.stringify(_properties), state: JSON.stringify(component.state) });
+      console.log(`<${tagName}>`, 'render()', Object.assign({}, _properties));
 
     if (!_isAttached)
       return;
@@ -221,5 +228,14 @@ const Component = (component = {}) => {
   return component;
 };
 
+
+Component.hooks = {
+  create: Component,
+  attach: noop,
+  detach: noop,
+  render: noop,
+  define: identity,
+  update: (component, properties, oldProperties) => !component.isRendered || !isDeeplyEqual(properties, oldProperties)
+};
 
 export default Component;

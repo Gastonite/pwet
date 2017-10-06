@@ -14,7 +14,7 @@ const ShadowComponent =  (component) => {
   component.root = element.attachShadow({ mode: 'open' });
 
   if (verbose)
-    console.log('ShadowComponent()', hooks.render);
+    console.log('ShadowComponent()');
 
   hooks.render = decorate(hooks.render, (next, component) => {
 

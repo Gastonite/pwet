@@ -1,11 +1,25 @@
 import LodashKebabCase from 'lodash.kebabcase';
-import { noop, identity, decorate, clone } from './utilities';
+import { clone } from './utilities';
 import Component from './component';
 import pipe from 'ramda/src/pipe';
 
-import { assert, isString, isPlainObject, isArray, isEmpty, isElement, isObject, isUndefined, isFunction, isDeeplyEqual } from 'kwak';
+import { assert, isString, isPlainObject, isArray, isEmpty, isHTMLElement, isObject, isUndefined, isFunction } from 'kwak';
 
+const _parseMethods = (input, label = 'input', defaults = input) => {
 
+  assert(isObject(input), `'${label}' must be an object`);
+
+  Object.keys(input).forEach(key => {
+
+    const value = input[key] || defaults[key];
+
+    assert(isFunction(value), `'${key}' must be a function`);
+
+    input[key] = value;
+  });
+
+  return input;
+};
 
 const _definitions = [];
 const $pwet = Symbol('__pwet');
@@ -16,7 +30,7 @@ const Definition = (definition = {}) => {
     return definition;
 
   definition = isArray(definition)
-    ? Definition.fromArray(definition)
+    ? Definition.composeDefinition(definition)
     : Definition.parseDefinition(definition);
 
   definition.type = class extends definition.type {
@@ -49,11 +63,9 @@ const Definition = (definition = {}) => {
   return definition;
 };
 
-
-Definition.fromArray = definition => {
+Definition.composeDefinition = definition => {
 
   assert(isArray(definition), `'definition' must be an array`);
-  //assert(definition.every(isFunction), `'definition' array must only contains functions`);
 
   if (!definition.includes(Component))
     definition.push(Component);
@@ -61,18 +73,16 @@ Definition.fromArray = definition => {
   return Definition.parseDefinition(
     Object.assign(
       pipe(...definition.filter(isFunction)),
-      definition.reduce((before, after) => {
+      definition.reverse().reduce((before, after) => {
 
         const hooks = {...before.hooks};
 
         if (isObject(after.hooks)) {
 
-          const hooksOverride = {};
+          Object.assign(hooks, after.hooks);
 
           if (isFunction(before.hooks.define) && isFunction(after.hooks.define))
-            hooksOverride.define = pipe(before.hooks.define, after.hooks.define);
-
-          Object.assign(hooks, after.hooks, hooksOverride);
+            hooks.define = pipe(before.hooks.define, after.hooks.define);
         }
 
         return Object.assign(before, after, { hooks });
@@ -83,8 +93,7 @@ Definition.fromArray = definition => {
 
 Definition.parseDefinition = (definition = {}) => {
 
-  console.log('Definition.parseDefinition()')
-  console.log('Definition.parseDefinition()')
+  console.log('Definition.parseDefinition()');
 
   if (isFunction(definition)) {
 
@@ -102,7 +111,7 @@ Definition.parseDefinition = (definition = {}) => {
 
   assert(isObject(definition), `'definition' must be an object`);
 
-  const { properties = {}, hooks = {}, attributes = {}, dependencies = {}, verbose } = definition;
+  const { properties = {}, hooks = {}, updaters = {}, attributes = {}, verbose } = definition;
   let { tagName, type = HTMLElement, style = '' } = definition;
 
 
@@ -115,7 +124,7 @@ Definition.parseDefinition = (definition = {}) => {
 
 
   // Type
-  assert(isFunction(type) && (type === HTMLElement || isElement(type.prototype)),
+  assert(isFunction(type) && (type === HTMLElement || isHTMLElement(type.prototype)),
     `'type' must be a subclass of HTMLElement`);
 
 
@@ -148,14 +157,16 @@ Definition.parseDefinition = (definition = {}) => {
 
 
   // Hooks
-  assert(isObject(hooks), `'hooks' must be an object`);
-  Object.keys(Definition.defaultHooks).forEach((key) => {
+  _parseMethods(hooks, 'hooks');
+  console.log('define hooks=', hooks);
 
-    const hook = hooks[key] || Definition.defaultHooks[key];
 
-    assert(isFunction(hook), `'${key}' must be a function`);
+  // Updaters
+  _parseMethods(updaters, 'updaters');
+  Object.keys(updaters).forEach(key => {
+    const updater = updaters[key];
 
-    hooks[key] = hook;
+
   });
 
   return {
@@ -164,26 +175,15 @@ Definition.parseDefinition = (definition = {}) => {
     type,
     properties,
     attributes,
-    dependencies,
     style,
-    verbose,
-    hooks
+    hooks,
+    updaters,
+    verbose
   };
 };
 
 Definition.getDefinition = input => _definitions.find(definition => definition.tagName === input);
 Definition.isDefinition = input => _definitions.includes(input);
-Definition.defaultHooks = {
-  create: Component,
-  attach: noop,
-  detach: noop,
-  render: noop,
-  define: identity,
-  update: (component, properties, oldProperties) => {
-
-    return !component.isRendered || !isDeeplyEqual(properties, oldProperties);
-  }
-};
 
 export {
   Definition as default,
